@@ -623,7 +623,7 @@
         
         <div class="stock-grid">
           <div class="stock-item">
-            <div class="stock-label">PER 90天LH</div>
+            <div class="stock-label">日PER 90天LH</div>
             <div class="stock-value">${renderRangeMetric(s.per_latest, s.per_90d_low, s.per_90d_high)}</div>
           </div>
           <div class="stock-item">
@@ -631,7 +631,7 @@
             <div class="stock-value">${renderMetric3(s.rev, s.rev_mom, s.rev_qoq, s.rev_yoy)}</div>
           </div>
           <div class="stock-item">
-            <div class="stock-label">毛利率</div>
+            <div class="stock-label">利率</div>
             <div class="stock-value">${renderMetric3(s.gross_margin, null, s.gross_margin_qoq, s.gross_margin_yoy_diff)}</div>
           </div>
           <div class="stock-item">
@@ -643,18 +643,18 @@
             <div class="stock-value">${renderMetric3(s.net_margin, null, s.net_margin_qoq, s.net_margin_yoy_diff)}</div>
           </div>
           <div class="stock-item">
-            <div class="stock-label">PBR 90天LH</div>
+            <div class="stock-label">日PBR 90天LH</div>
             <div class="stock-value">${renderRangeMetric(s.pbr_latest, s.pbr_90d_low, s.pbr_90d_high)}</div>
           </div>
           <div class="stock-item">
-            <div class="stock-label">KD 3天趨勢</div>
+            <div class="stock-label">日KD 3天趨勢</div>
             <div class="stock-value">
               <div class="table-lv1">${fmt(s.k)} / ${fmt(s.d)}</div>
             </div>
           </div>
 
           <div class="stock-item">
-            <div class="stock-label">布林% 價格LH</div>
+            <div class="stock-label">日布林% 價格LH</div>
             <div class="stock-value">
               <div class="table-lv1 ${trendClass(s.bb_score)}">${fmtTrend(s.bb_score)}</div>
               ${renderRangeMetric(s.bb_pct, s.bb_lower, s.bb_upper)}
@@ -662,28 +662,29 @@
           </div>
 
           <div class="stock-item">
-            <div class="stock-label">Bias6 LH</div>
+            <div class="stock-label">日Bias6 LH</div>
             <div class="stock-value">
               ${renderRangeMetric(s.bias6, s.bias6_min, s.bias6_max, "%")}
             </div>
           </div>
 
           <div class="stock-item">
-            <div class="stock-label">Bias18 LH</div>
+            <div class="stock-label">日Bias18 LH</div>
             <div class="stock-value">
               ${renderRangeMetric(s.bias18, s.bias18_min, s.bias18_max, "%")}
             </div>
           </div>
 
+          
           <div class="stock-item">
-            <div class="stock-label">Bias50 LH</div>
+            <div class="stock-label">日Bias50 LH</div>
             <div class="stock-value">
               ${renderRangeMetric(s.bias50, s.bias50_min, s.bias50_max, "%")}
             </div>
           </div>
           
           <div class="stock-item">
-            <div class="stock-label">成交量</div>
+            <div class="stock-label">日成交量</div>
             <div class="stock-value">
               <div>${fmt(s.volume)} 張</div>
               <div class="table-lv2">昨: ${fmt(s.prev_volume)}</div>
@@ -691,7 +692,7 @@
           </div>
 
           <div class="stock-item">
-            <div class="stock-label">量增%</div>
+            <div class="stock-label">日量增%</div>
             <div class="stock-value">
               <div class="${(s.volume_ratio ?? 0) > 0 ? 'up' : 'dn'}">
                 ${fmt(s.volume_ratio, "%")}
