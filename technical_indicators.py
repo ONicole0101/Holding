@@ -62,6 +62,9 @@ def get_kd_trend(df):
             }
 
         # === K 三日趨勢 ===
+        # Sample === k_vals[0]   # [0]三天前
+        # Sample === k_vals[1]   # [1]前一天
+        # Sample === k_vals[2]   # [2]最新一天
         k_up = k_vals[2] > k_vals[1] > k_vals[0]
         k_down = k_vals[2] < k_vals[1] < k_vals[0]
 
