@@ -24,7 +24,7 @@ def get_stock_data(stock_id):
             'start_date': '2023-01-01',
             'token': API_TOKEN,
         }
-        res = requests.get(API_URL, params=params, timeout=30)
+        res = requests.get(API_URL, params=params, timeout=300)
         data = res.json()
 
         if res.status_code == 402:
@@ -78,7 +78,7 @@ def get_revenue_raw(stock_id):
             'token': API_TOKEN,
         }
 
-        res = requests.get(API_URL, params=params, timeout=10)
+        res = requests.get(API_URL, params=params, timeout=300)
 
         if res.status_code != 200:
             return []
@@ -111,7 +111,7 @@ def get_eps_raw(stock_id):
             'start_date': '2020-01-01',
             'token': API_TOKEN,
         }
-        return requests.get(API_URL, params=params, timeout=10).json().get('data', [])
+        return requests.get(API_URL, params=params, timeout=300).json().get('data', [])
     except Exception as e:
         print(f'❌ EPS source error {stock_id}: {e}')
         return []
@@ -125,7 +125,7 @@ def get_dividend_raw(stock_id):
             'start_date': '2020-01-01',
             'token': API_TOKEN,
         }
-        res = requests.get(API_URL, params=params, timeout=10)
+        res = requests.get(API_URL, params=params, timeout=300)
         if res.status_code != 200:
             return []
         return res.json().get('data', [])
@@ -142,7 +142,7 @@ def get_per_raw(stock_id):
             'start_date': '2023-01-01',
             'token': API_TOKEN,
         }
-        res = requests.get(API_URL, params=params, timeout=10)
+        res = requests.get(API_URL, params=params, timeout=300)
         return res.json().get('data', [])
     except Exception:
         return []
@@ -172,7 +172,7 @@ def get_per_pbr_90d_stats(stock_id, days=90):
             "token": API_TOKEN,
         }
 
-        res = requests.get(API_URL, params=params, timeout=10)
+        res = requests.get(API_URL, params=params, timeout=300)
         if res.status_code != 200:
             return {
                 "per": None,
