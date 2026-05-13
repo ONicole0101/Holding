@@ -7,7 +7,13 @@ import pandas as pd
 import requests
 import config
 
-from data_sources import get_revenue_raw, get_per_pbr_90d_stats
+from data_sources import (
+    get_revenue_raw,
+    get_per_pbr_90d_stats,
+    get_finmind_user_info,
+    get_finmind_token_status,
+    log_finmind_static_event,
+)
 from financial_analysis import (
     get_eps_analysis,
     get_profit_ratio,
@@ -46,7 +52,19 @@ SOURCE_META_COLS = []
 for g in GROUPS:
     SOURCE_META_COLS += [f"{g}_status", f"{g}_reason"]
 
-ORDERED_COLS = BASE_COLS + SOURCE_META_COLS
+FINMIND_META_COLS = [
+    "finmind_token_status",
+    "finmind_token_source",
+    "finmind_token_masked",
+    "finmind_user_count",
+    "finmind_api_request_limit",
+    "finmind_remain",
+    "finmind_usage_checked_at",
+]
+
+ORDERED_COLS = BASE_COLS + SOURCE_META_COLS + FINMIND_META_COLS
+
+_LAST_FINMIND_USAGE_INFO = None
 
 TERMINAL_STATUSES = {"ok", "partial_ok"}
 SOURCE_TERMINAL_STATUSES = {"ok", "no_data"}
@@ -160,6 +178,7 @@ def is_stale_ok_row(row: dict, refresh_hours: int) -> bool:
 
     return datetime.utcnow() - updated_at > timedelta(hours=refresh_hours)
 
+
 def all_blank(row: dict, cols: list[str]) -> bool:
     return all(is_blank_value(row.get(c)) for c in cols)
 
@@ -168,16 +187,60 @@ def any_blank(row: dict, cols: list[str]) -> bool:
     return any(is_blank_value(row.get(c)) for c in cols)
 
 
+def _normalize_finmind_usage_info(info: dict | None) -> dict:
+    info = info or {}
+    return {
+        "finmind_token_status": info.get("login_status") or ("ok" if info.get("token_present") else "missing_token"),
+        "finmind_token_source": info.get("token_source") or "",
+        "finmind_token_masked": info.get("token_masked") or "",
+        "finmind_user_count": info.get("user_count"),
+        "finmind_api_request_limit": info.get("api_request_limit"),
+        "finmind_remain": info.get("remain"),
+        "finmind_usage_checked_at": now_utc_str(),
+    }
+
+
+def apply_finmind_usage_to_row(row: dict, info: dict | None = None) -> dict:
+    """Attach latest FinMind token/quota evidence to one AllStatic row."""
+    global _LAST_FINMIND_USAGE_INFO
+    if info is None:
+        info = _LAST_FINMIND_USAGE_INFO or get_finmind_token_status()
+    row.update(_normalize_finmind_usage_info(info))
+    return row
+
+
 def get_finmind_usage():
-    token = os.getenv("FINMIND_TOKEN")
-    headers = {"Authorization": f"Bearer {token}"} if token else {}
-    url = "https://api.web.finmindtrade.com/v2/user_info"
-    resp = requests.get(url, headers=headers, timeout=300)
-    data = resp.json()
-    used = int(data.get("user_count", 0) or 0)
-    limit = int(data.get("api_request_limit", 0) or 0)
-    remain = max(limit - used, 0)
+    """
+    Check FinMind user_info with the same token configured in data_sources.py.
+
+    This confirms:
+    1. FINMIND_TOKEN was loaded.
+    2. DataLoader.login_by_token() was attempted.
+    3. FinMind user_info accepts the token and returns usage/quota.
+    """
+    global _LAST_FINMIND_USAGE_INFO
+
+    info = get_finmind_user_info(write_log=True, source="generate_static_csv")
+    _LAST_FINMIND_USAGE_INFO = info
+
+    used = int(info.get("user_count") or 0)
+    limit = int(info.get("api_request_limit") or 0)
+    remain = info.get("remain")
+    remain = int(remain or 0) if remain is not None else 0
+
+    token_msg = (
+        f"token_present={info.get('token_present')}, "
+        f"source={info.get('token_source')}, "
+        f"token={info.get('token_masked')}, "
+        f"login={info.get('login_status')}"
+    )
+    print(f"FinMind token: {token_msg}", flush=True)
     print(f"FinMind usage: {used}/{limit}, remain={remain}", flush=True)
+
+    if not info.get("ok"):
+        print(
+            f"⚠️ FinMind token/user_info check failed: {info.get('message')}", flush=True)
+
     return used, limit, remain
 
 
@@ -195,6 +258,7 @@ def empty_static_row(s: dict) -> dict:
     row["static_reason"] = "not processed yet"
     for g in GROUPS:
         set_group_status(row, g, "pending", "not processed yet")
+    apply_finmind_usage_to_row(row)
     return row
 
 
@@ -234,6 +298,7 @@ def get_revenue_trend(stock_id):
 
 
 def finalize_static_status(row: dict) -> dict:
+    row = apply_finmind_usage_to_row(row)
     problems = []
     no_data_groups = []
 
@@ -476,7 +541,15 @@ def repair_legacy_status_only(df: pd.DataFrame) -> pd.DataFrame:
     return normalize_static_df(pd.DataFrame(repaired))
 
 
-def build_incremental(stock_list, output_file, max_rows, min_remain, retry_errors, retry_no_data, force, sleep_sec, repair_only,check_every, refresh_hours):
+def build_incremental(stock_list, output_file, max_rows, min_remain, retry_errors, retry_no_data, force, sleep_sec, repair_only, check_every, refresh_hours):
+    token_status = get_finmind_token_status()
+    log_finmind_static_event(
+        "generate_static_start",
+        source="generate_static_csv",
+        status=token_status.get("login_status"),
+        message=f"output={output_file}, token={token_status.get('token_masked')}",
+    )
+
     existing = read_existing_static(output_file)
     existing = repair_legacy_status_only(existing)
     existing_by_id = {
@@ -525,6 +598,9 @@ def build_incremental(stock_list, output_file, max_rows, min_remain, retry_error
         if should_check_usage:
             try:
                 _, limit, remain = get_finmind_usage()
+                current_usage = _LAST_FINMIND_USAGE_INFO
+                for _sid in rows_by_id:
+                    apply_finmind_usage_to_row(rows_by_id[_sid], current_usage)
                 if limit <= 0:
                     print(
                         "FinMind usage unknown/unreliable; continue until explicit upper limit error", flush=True)
@@ -540,6 +616,7 @@ def build_incremental(stock_list, output_file, max_rows, min_remain, retry_error
             f"Processing {i}/{len(candidates)}: {sid} {s.get('name')}", flush=True)
 
         row = build_static_row(s)
+        apply_finmind_usage_to_row(row)
         rows_by_id[sid] = row
         processed += 1
 
@@ -559,6 +636,13 @@ def build_incremental(stock_list, output_file, max_rows, min_remain, retry_error
     final_df = read_existing_static(output_file)
     status_counts = final_df["static_status"].astype(
         str).str.lower().value_counts().to_dict() if not final_df.empty else {}
+    log_finmind_static_event(
+        "generate_static_end",
+        source="generate_static_csv",
+        status=stop_reason,
+        message=f"updated={processed}, output={output_file}",
+    )
+
     print(f"Run stopped: {stop_reason}", flush=True)
     print(f"Updated this run: {processed}", flush=True)
     print(
@@ -596,7 +680,7 @@ def main():
     parser.add_argument("--check-every", type=int, default=10,
                         help="Check FinMind usage before first stock and every N processed stocks. Use 1 for every stock.")
     parser.add_argument("--refresh-hours", type=int, default=24,
-                    help="Refresh rows whose static_status is ok and static_updated_at is older than N hours. Use 0 to disable.")
+                        help="Refresh rows whose static_status is ok and static_updated_at is older than N hours. Use 0 to disable.")
     args = parser.parse_args()
 
     try:
