@@ -13,7 +13,7 @@ def get_finmind_usage():
     token = os.getenv("FINMIND_TOKEN")
     headers = {"Authorization": f"Bearer {token}"}
     url = "https://api.web.finmindtrade.com/v2/user_info"
-    resp = requests.get(url, headers=headers, timeout=10)
+    resp = requests.get(url, headers=headers, timeout=30)
     data = resp.json()
     used = data.get("user_count", 0)
     limit = data.get("api_request_limit", 0)
@@ -74,7 +74,7 @@ def build_strings(data):
 def main():
     try:
         report_type = config.REPORT_TYPE
-        csv_file = config.CSV_FILE.strip()
+        csv_file = config.CSV_FILE
         report_title = config.REPORT_TITLE
         output_file = config.OUTPUT_FILE
         static_csv_file = get_static_csv_path()

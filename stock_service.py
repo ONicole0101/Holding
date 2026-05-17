@@ -412,19 +412,8 @@ def process_stock(s, static_map=None):
         return x
 
 
-def _bool_text(v):
-    return str(v).strip().lower() == "true"
-
-
 def _build_static_fields(static_row):
     return {
-        "eps_Y_is_prev": _bool_text(static_row.get("eps_Y_is_prev")),
-        "eps_ttm_is_prev": _bool_text(static_row.get("eps_ttm_is_prev")),
-        "gross_margin_is_prev": _bool_text(static_row.get("gross_margin_is_prev")),
-        "operating_margin_is_prev": _bool_text(static_row.get("operating_margin_is_prev")),
-        "net_margin_is_prev": _bool_text(static_row.get("net_margin_is_prev")),
-        "per_latest_is_prev": _bool_text(static_row.get("per_latest_is_prev")),
-        "pbr_latest_is_prev": _bool_text(static_row.get("pbr_latest_is_prev")),
         "eps_Y": to_float_or_none(static_row.get("eps_Y")),
         "eps_ttm": to_float_or_none(static_row.get("eps_ttm")),
         "per_Y": to_float_or_none(static_row.get("per_Y")),
