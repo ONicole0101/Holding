@@ -1,7 +1,9 @@
 name: Cleanup Reports(RPT)
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:  
+  schedule:
+    - cron: "0 1 * * 1-5"    ## 台灣時間 週一至週五 09:00 (UTC 01:00)
 
 jobs:
   cleanup:
