@@ -18,39 +18,35 @@ from financial_analysis import (
     get_eps_analysis,
     get_profit_ratio,
     extract_metric,
+    extract_metric_is_prev,
 )
 
 DATA_COLS = [
     "eps_Y", "eps_ttm", "per_Y", "per_ttm",
-    "eps_Y_is_prev", "eps_ttm_is_prev",
     "rev", "rev_mom", "rev_qoq", "rev_yoy",
-    "gross_margin", "gross_margin_qoq", "gross_margin_yoy_diff", "gross_margin_is_prev",
-    "operating_margin", "operating_margin_qoq", "operating_margin_yoy_diff", "operating_margin_is_prev",
-    "net_margin", "net_margin_qoq", "net_margin_yoy_diff", "net_margin_is_prev",
-    "per_latest", "per_90d_high", "per_90d_low", "per_latest_is_prev",
-    "pbr_latest", "pbr_90d_high", "pbr_90d_low", "pbr_latest_is_prev",
+    "gross_margin", "gross_margin_qoq", "gross_margin_yoy_diff",
+    "operating_margin", "operating_margin_qoq", "operating_margin_yoy_diff",
+    "net_margin", "net_margin_qoq", "net_margin_yoy_diff",
+    "per_latest", "per_90d_high", "per_90d_low",
+    "pbr_latest", "pbr_90d_high", "pbr_90d_low",
 ]
 
-FLAG_COLS = [c for c in DATA_COLS if c.endswith("_is_prev")]
-
-# EPS 完整性只看 EPS 本身。per_Y/per_ttm 需要即時股價，靜態 CSV 不傳股價時本來就會是空。
 GROUPS = {
+    # Required fields for status. Optional derived fields such as per_Y/per_ttm,
+    # QoQ/YoY and 90D high/low should not make a row look empty.
     "eps": ["eps_Y", "eps_ttm"],
-    "revenue": ["rev", "rev_mom", "rev_qoq", "rev_yoy"],
-    "profit": [
-        "gross_margin", "gross_margin_qoq", "gross_margin_yoy_diff",
-        "operating_margin", "operating_margin_qoq", "operating_margin_yoy_diff",
-        "net_margin", "net_margin_qoq", "net_margin_yoy_diff",
-    ],
-    "valuation": [
-        "per_latest", "per_90d_high", "per_90d_low",
-        "pbr_latest", "pbr_90d_high", "pbr_90d_low",
-    ],
+    "revenue": ["rev"],
+    "profit": ["gross_margin", "operating_margin", "net_margin"],
+    "valuation": ["per_latest", "pbr_latest"],
 }
 
-REQUIRED_DATA_COLS = sorted({c for cols in GROUPS.values() for c in cols})
+PREV_FLAG_COLS = [
+    "eps_Y_is_prev", "eps_ttm_is_prev",
+    "gross_margin_is_prev", "operating_margin_is_prev", "net_margin_is_prev",
+    "per_latest_is_prev", "pbr_latest_is_prev",
+]
 
-BASE_COLS = ["stock_id", "name"] + DATA_COLS + [
+BASE_COLS = ["stock_id", "name"] + DATA_COLS + PREV_FLAG_COLS + [
     "static_updated_at", "static_status", "static_reason",
 ]
 
@@ -73,7 +69,7 @@ ORDERED_COLS = BASE_COLS + SOURCE_META_COLS + FINMIND_META_COLS
 _LAST_FINMIND_USAGE_INFO = None
 
 TERMINAL_STATUSES = {"ok", "partial_ok"}
-SOURCE_TERMINAL_STATUSES = {"ok", "no_data"}
+SOURCE_TERMINAL_STATUSES = {"ok"}
 DEFAULT_REFRESH_DAYS = 7
 
 
@@ -175,8 +171,7 @@ def is_stale_ok_row(row: dict, refresh_hours: int) -> bool:
         return False
 
     status = str(row.get("static_status", "")).strip().lower()
-    # ok / partial_ok 都會定期刷新，避免 EPS/財報晚發布後被舊 no_data 凍住。
-    if status not in {"ok", "partial_ok"}:
+    if status != "ok":
         return False
 
     updated_at = parse_static_updated_at(row.get("static_updated_at"))
@@ -263,7 +258,7 @@ def empty_static_row(s: dict) -> dict:
     row["static_updated_at"] = now_utc_str()
     row["static_status"] = "incomplete"
     row["static_reason"] = "not processed yet"
-    for c in FLAG_COLS:
+    for c in PREV_FLAG_COLS:
         row[c] = "False"
     for g in GROUPS:
         set_group_status(row, g, "pending", "not processed yet")
@@ -272,7 +267,6 @@ def empty_static_row(s: dict) -> dict:
 
 
 def get_revenue_trend(stock_id):
-    """月營收：保留最新營收；月增/季增/年增依可用月份逐項計算。"""
     data = get_revenue_raw(stock_id)
     if not data:
         return None, "empty"
@@ -291,26 +285,22 @@ def get_revenue_trend(stock_id):
     if df.empty:
         return None, "empty after clean"
 
-    curr = float(df.iloc[-1]["revenue"])
+    curr = df.iloc[-1]["revenue"]
 
     def pct_by_offset(offset: int):
         if len(df) <= offset:
             return None
-        base = float(df.iloc[-1 - offset]["revenue"])
-        if base == 0:
+        prev = df.iloc[-1 - offset]["revenue"]
+        if prev is None or pd.isna(prev) or prev == 0:
             return None
-        return round((curr - base) / base * 100, 2)
+        return round((curr - prev) / prev * 100, 2)
 
-    result = {
+    return {
         "rev": round(curr / 1e8, 2),
         "mom": pct_by_offset(1),
         "qoq": pct_by_offset(3),
         "yoy": pct_by_offset(12),
-    }
-
-    missing = [k for k, v in result.items() if v is None]
-    reason = "" if not missing else "partial missing:" + ",".join(missing)
-    return result, reason
+    }, ""
 
 
 def finalize_static_status(row: dict) -> dict:
@@ -368,7 +358,6 @@ def build_static_row(s: dict) -> dict:
 
     # EPS and annual/TTM PER.
     try:
-        # current_price 不要傳 1，避免 per_Y / per_ttm 變成 1 / EPS 的假數字。
         eps_res = get_eps_analysis(stock_id, None)
         print("EPS =", stock_id, eps_res, flush=True)
         eps_res = tuple(eps_res) if isinstance(eps_res, tuple) else (None,) * 6
@@ -426,18 +415,15 @@ def build_static_row(s: dict) -> dict:
         row["gross_margin"] = cur_g
         row["gross_margin_qoq"] = qoq_g
         row["gross_margin_yoy_diff"] = yoy_g
-        row["gross_margin_is_prev"] = "True" if (profit_res or {}).get(
-            "current_is_prev", {}).get("gross") else "False"
         row["operating_margin"] = cur_o
         row["operating_margin_qoq"] = qoq_o
         row["operating_margin_yoy_diff"] = yoy_o
-        row["operating_margin_is_prev"] = "True" if (profit_res or {}).get(
-            "current_is_prev", {}).get("op") else "False"
         row["net_margin"] = cur_n
         row["net_margin_qoq"] = qoq_n
         row["net_margin_yoy_diff"] = yoy_n
-        row["net_margin_is_prev"] = "True" if (profit_res or {}).get(
-            "current_is_prev", {}).get("net") else "False"
+        row["gross_margin_is_prev"] = "True" if extract_metric_is_prev(profit_res, "gross") else "False"
+        row["operating_margin_is_prev"] = "True" if extract_metric_is_prev(profit_res, "op") else "False"
+        row["net_margin_is_prev"] = "True" if extract_metric_is_prev(profit_res, "net") else "False"
         if all_blank(row, GROUPS["profit"]):
             set_group_status(row, "profit", "no_data",
                              "empty")
@@ -458,13 +444,11 @@ def build_static_row(s: dict) -> dict:
         row["per_latest"] = per_pbr.get("per")
         row["per_90d_high"] = per_pbr.get("per_90d_high")
         row["per_90d_low"] = per_pbr.get("per_90d_low")
-        row["per_latest_is_prev"] = "True" if per_pbr.get(
-            "per_is_prev") else "False"
         row["pbr_latest"] = per_pbr.get("pbr")
         row["pbr_90d_high"] = per_pbr.get("pbr_90d_high")
         row["pbr_90d_low"] = per_pbr.get("pbr_90d_low")
-        row["pbr_latest_is_prev"] = "True" if per_pbr.get(
-            "pbr_is_prev") else "False"
+        row["per_latest_is_prev"] = "True" if per_pbr.get("per_is_prev") else "False"
+        row["pbr_latest_is_prev"] = "True" if per_pbr.get("pbr_is_prev") else "False"
         if all_blank(row, GROUPS["valuation"]):
             set_group_status(row, "valuation", "no_data",
                              "empty")
@@ -482,35 +466,17 @@ def build_static_row(s: dict) -> dict:
     return finalize_static_status(row)
 
 
-def normalize_bool_text(value) -> str:
-    """CSV 以 dtype=str 讀入；旗標欄統一用字串，避免 pandas string dtype 寫入 bool 報錯。"""
-    if is_blank_value(value):
-        return "False"
-    text = str(value).strip().lower()
-    if text in {"true", "1", "yes", "y", "t"}:
-        return "True"
-    return "False"
-
-
 def normalize_static_df(df: pd.DataFrame) -> pd.DataFrame:
     if df is None or df.empty:
-        out = pd.DataFrame(columns=ORDERED_COLS)
-        for c in FLAG_COLS:
-            out[c] = out.get(c, pd.Series(dtype="string"))
-        return out
-
+        return pd.DataFrame(columns=ORDERED_COLS)
     df = df.copy()
     df.columns = df.columns.str.strip()
     for c in ORDERED_COLS:
         if c not in df.columns:
             df[c] = None
-
+    for c in PREV_FLAG_COLS:
+        df[c] = df[c].apply(lambda v: "True" if str(v).strip().lower() == "true" else "False")
     df["stock_id"] = df["stock_id"].astype(str).str.strip()
-
-    # 重要：不要在 string dtype 欄位塞入 bool；全部轉成 "True"/"False" 字串。
-    for c in FLAG_COLS:
-        df[c] = df[c].map(normalize_bool_text).astype("string")
-
     return df[ORDERED_COLS]
 
 
@@ -528,8 +494,7 @@ def atomic_write_csv(df: pd.DataFrame, path: str):
 
 
 def legacy_missing_data_cols(row: dict) -> list[str]:
-    # 只用真正必要資料判斷缺漏；不要把顯示旗標或 per_Y/per_ttm 當成缺資料。
-    return [c for c in REQUIRED_DATA_COLS if is_blank_value(row.get(c))]
+    return [c for c in DATA_COLS if is_blank_value(row.get(c))]
 
 
 def should_update(row, retry_errors: bool, retry_no_data: bool, force: bool, refresh_hours: int) -> bool:

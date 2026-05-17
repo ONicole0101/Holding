@@ -56,110 +56,118 @@ def build_output(result):
     }
 
 
+
+def _metric_name_mask(df: pd.DataFrame, names: list[str]):
+    """Match FinMind metric by type/name/origin_name, tolerant of Chinese labels."""
+    mask = pd.Series(False, index=df.index)
+    for col in ("type", "name", "origin_name"):
+        if col in df.columns:
+            s = df[col].astype(str)
+            for name in names:
+                mask = mask | s.str.fullmatch(name, case=False, na=False) | s.str.contains(name, case=False, na=False, regex=False)
+    return mask
+
+
+def _standardize_financial_df(data) -> pd.DataFrame:
+    df = data.copy() if isinstance(data, pd.DataFrame) else pd.DataFrame(data or [])
+    if df.empty or "date" not in df.columns or "value" not in df.columns:
+        return pd.DataFrame()
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df["value"] = pd.to_numeric(df["value"], errors="coerce")
+    return df.dropna(subset=["date", "value"]).sort_values("date")
+
+
 def get_profit_ratio(stock_id):
     """
-    財務三率：用最新可計算資料；若最新公告期缺科目，回補最近一期有效值。
-    回傳 current_is_prev 旗標，讓前端標註「(前期)」。
+    Return latest available gross/operating/net margins.
+
+    Important: do NOT drop the whole quarter just because one metric is missing.
+    Each margin finds its own latest valid Revenue + numerator pair. This prevents
+    FinMind having data for one ratio while another incomplete field makes all
+    margins blank.
     """
     try:
-        df = get_profit_ratio_raw(stock_id)
-        if df is None or df.empty:
+        df = _standardize_financial_df(get_profit_ratio_raw(stock_id))
+        if df.empty:
             return None
 
-        df['date'] = pd.to_datetime(df['date'])
-        df['value'] = pd.to_numeric(df['value'], errors='coerce')
-        df = df.dropna(subset=['date']).sort_values('date')
+        metric_aliases = {
+            "Revenue": ["Revenue", "營業收入", "營業收入合計", "收益", "收入"],
+            "GrossProfit": ["GrossProfit", "營業毛利", "營業毛利（毛損）", "毛利"],
+            "OperatingIncome": ["OperatingIncome", "營業利益", "營業利益（損失）", "營益", "營業淨利"],
+            "IncomeAfterTaxes": ["IncomeAfterTaxes", "本期淨利", "稅後淨利", "本期淨利（淨損）", "淨利"],
+        }
 
-        pivot = df.pivot_table(
-            index='date',
-            columns='type',
-            values='value',
-            aggfunc='last',
-        ).sort_index()
+        parts = []
+        for std_name, aliases in metric_aliases.items():
+            m = df.loc[_metric_name_mask(df, aliases), ["date", "value"]].copy()
+            if m.empty:
+                continue
+            m["metric"] = std_name
+            parts.append(m)
 
-        cols = ['Revenue', 'GrossProfit',
-                'OperatingIncome', 'IncomeAfterTaxes']
-        for c in cols:
-            if c not in pivot.columns:
-                pivot[c] = pd.NA
-        pivot = pivot[cols].apply(pd.to_numeric, errors='coerce')
-        if pivot.empty:
+        if not parts:
             return None
 
-        latest_report_date = pivot.index.max()
+        long_df = pd.concat(parts, ignore_index=True)
+        pivot = long_df.pivot_table(index="date", columns="metric", values="value", aggfunc="last").sort_index()
+        if "Revenue" not in pivot.columns:
+            return None
 
-        def metric_series(numerator):
-            tmp = pivot[[numerator, 'Revenue']].copy()
-            tmp = tmp.dropna(subset=[numerator, 'Revenue'])
-            tmp = tmp[tmp['Revenue'] > 0]
+        latest_statement_date = pivot.index.max()
+
+        def margin_series(numerator: str):
+            if numerator not in pivot.columns:
+                return pd.DataFrame(columns=["margin"])
+            tmp = pivot[["Revenue", numerator]].copy()
+            tmp["Revenue"] = pd.to_numeric(tmp["Revenue"], errors="coerce")
+            tmp[numerator] = pd.to_numeric(tmp[numerator], errors="coerce")
+            tmp = tmp.dropna(subset=["Revenue", numerator])
+            tmp = tmp[tmp["Revenue"] > 0]
             if tmp.empty:
-                return pd.Series(dtype='float64')
-            return (tmp[numerator] / tmp['Revenue'] * 100).round(2)
+                return pd.DataFrame(columns=["margin"])
+            tmp["margin"] = (tmp[numerator] / tmp["Revenue"] * 100).round(2)
+            return tmp[["margin"]]
 
-        def pick_metric(numerator):
-            s = metric_series(numerator)
-            if s.empty:
-                return {
-                    'current': None,
-                    'prev': None,
-                    'yoy': None,
-                    'qoq': None,
-                    'yoy_diff': None,
-                    'is_prev': False,
-                }
+        def calc_one(numerator: str):
+            ms = margin_series(numerator)
+            if ms.empty:
+                return {"current": None, "prev": None, "yoy": None, "qoq": None, "yoy_diff": None, "is_prev": False}
 
-            current_date = s.index[-1]
-            current = float(s.iloc[-1])
-            prev = float(s.iloc[-2]) if len(s) >= 2 else None
-            yoy = float(s.iloc[-5]) if len(s) >= 5 else None
+            current_date = ms.index.max()
+            current = float(ms.loc[current_date, "margin"])
+
+            prev = None
+            if len(ms) >= 2:
+                prev = float(ms.iloc[-2]["margin"])
+
+            same_q_last_year = current_date - pd.DateOffset(years=1)
+            yoy = None
+            if same_q_last_year in ms.index:
+                yoy = float(ms.loc[same_q_last_year, "margin"])
+            elif len(ms) >= 5:
+                yoy = float(ms.iloc[-5]["margin"])
 
             return {
-                'current': current,
-                'prev': prev,
-                'yoy': yoy,
-                'qoq': calc_diff(current, prev),
-                'yoy_diff': calc_diff(current, yoy),
-                'is_prev': bool(current_date < latest_report_date),
+                "current": round(current, 2),
+                "prev": round(prev, 2) if prev is not None else None,
+                "yoy": round(yoy, 2) if yoy is not None else None,
+                "qoq": calc_diff(current, prev),
+                "yoy_diff": calc_diff(current, yoy),
+                "is_prev": bool(current_date < latest_statement_date),
             }
 
-        gross = pick_metric('GrossProfit')
-        op = pick_metric('OperatingIncome')
-        net = pick_metric('IncomeAfterTaxes')
-
-        if all(x['current'] is None for x in [gross, op, net]):
-            return None
+        gross = calc_one("GrossProfit")
+        op = calc_one("OperatingIncome")
+        net = calc_one("IncomeAfterTaxes")
 
         return {
-            'current': {
-                'gross': gross['current'],
-                'op': op['current'],
-                'net': net['current'],
-            },
-            'prev': {
-                'gross': gross['prev'],
-                'op': op['prev'],
-                'net': net['prev'],
-            },
-            'yoy': {
-                'gross': gross['yoy'],
-                'op': op['yoy'],
-                'net': net['yoy'],
-            },
-            'qoq': {
-                'gross': gross['qoq'],
-                'op': op['qoq'],
-                'net': net['qoq'],
-            },
-            'yoy_diff': {
-                'gross': gross['yoy_diff'],
-                'op': op['yoy_diff'],
-                'net': net['yoy_diff'],
-            },
-            'current_is_prev': {
-                'gross': gross['is_prev'],
-                'op': op['is_prev'],
-                'net': net['is_prev'],
-            },
+            "current": {"gross": gross["current"], "op": op["current"], "net": net["current"]},
+            "prev": {"gross": gross["prev"], "op": op["prev"], "net": net["prev"]},
+            "yoy": {"gross": gross["yoy"], "op": op["yoy"], "net": net["yoy"]},
+            "qoq": {"gross": gross["qoq"], "op": op["qoq"], "net": net["qoq"]},
+            "yoy_diff": {"gross": gross["yoy_diff"], "op": op["yoy_diff"], "net": net["yoy_diff"]},
+            "is_prev": {"gross": gross["is_prev"], "op": op["is_prev"], "net": net["is_prev"]},
         }
     except Exception as e:
         print(f'❌ profit error {stock_id}: {e}')
@@ -170,107 +178,87 @@ def extract_metric(res, key):
     if not res:
         return None, None, None
     return (
-        res['current'].get(key),
-        res['qoq'].get(key),
-        res['yoy_diff'].get(key),
+        res.get('current', {}).get(key),
+        res.get('qoq', {}).get(key),
+        res.get('yoy_diff', {}).get(key),
     )
+
+
+def extract_metric_is_prev(res, key):
+    if not res:
+        return False
+    return bool(res.get('is_prev', {}).get(key, False))
 
 
 def get_eps_analysis(stock_id, current_price=None):
     """
-    EPS / EPS TTM：不再綁死今年與去年季別。
-    - eps_Y：最近一個四季完整年度 EPS；若不是最近可期待年度，標註前期。
-    - eps_ttm：最近四個有效季 EPS 合計；若最新有效季早於最近已結束季，標註前期。
-    回傳 6 欄：eps_Y, eps_ttm, per_Y, per_ttm, eps_Y_is_prev, eps_ttm_is_prev
+    EPS from FinMind TaiwanStockFinancialStatements.
+
+    Uses latest valid data instead of hard-coding current calendar year/quarter.
+    Returns: eps_Y, eps_ttm, per_Y, per_ttm, eps_Y_is_prev, eps_ttm_is_prev
     """
     try:
-        data = get_eps_raw(stock_id)
-        if not data:
-            return (None, None, None, None, False, False)
-
-        df = pd.DataFrame(data)
-        if "type" not in df.columns:
-            return (None, None, None, None, False, False)
-
-        # FinMind 官方範例 type 為 EPS、origin_name 為「基本每股盈餘」。
-        # 這裡同時支援 origin_name，避免部分資料列中文名稱存在但 type 命名差異造成誤判空白。
-        type_text = df["type"].astype(str).str.strip().str.upper()
-        eps_mask = type_text.eq("EPS")
-        if "origin_name" in df.columns:
-            origin_text = df["origin_name"].astype(str)
-            eps_mask = eps_mask | origin_text.str.contains(
-                "每股盈餘|基本每股盈餘|EPS", case=False, regex=True, na=False)
-
-        df = df[eps_mask].copy()
+        df = _standardize_financial_df(get_eps_raw(stock_id))
         if df.empty:
             return (None, None, None, None, False, False)
 
-        df["date"] = pd.to_datetime(df["date"], errors="coerce")
-        df["value"] = pd.to_numeric(df["value"], errors="coerce")
-        df = df.dropna(subset=["date", "value"])
-        if df.empty:
+        eps_mask = _metric_name_mask(df, ["EPS", "基本每股盈餘", "每股盈餘"])
+        eps_df = df.loc[eps_mask, ["date", "value"]].copy()
+        if eps_df.empty:
             return (None, None, None, None, False, False)
 
-        df["year"] = df["date"].dt.year
-        df["season"] = df["date"].dt.quarter
-        df = (
-            df.sort_values("date")
-              .drop_duplicates(["year", "season"], keep="last")
-              .reset_index(drop=True)
+        eps_df["year"] = eps_df["date"].dt.year.astype(int)
+        eps_df["season"] = eps_df["date"].dt.quarter.astype(int)
+        eps_df = (
+            eps_df.sort_values("date")
+                  .drop_duplicates(["year", "season"], keep="last")
+                  .dropna(subset=["value"])
+                  .reset_index(drop=True)
         )
+        if eps_df.empty:
+            return (None, None, None, None, False, False)
 
-        today = pd.Timestamp(datetime.now().date())
-        last_completed_q = ((today.month - 1) // 3)  # 0~3, 0 代表去年 Q4
-        if last_completed_q == 0:
-            expected_year = today.year - 1
-            expected_season = 4
+        latest_eps_date = eps_df["date"].max()
+
+        annual = (
+            eps_df.groupby("year")
+                  .agg(eps_sum=("value", "sum"), q_count=("season", "nunique"), last_date=("date", "max"))
+                  .reset_index()
+                  .sort_values("year")
+        )
+        annual_full = annual[annual["q_count"] >= 4]
+        if not annual_full.empty:
+            yrow = annual_full.iloc[-1]
         else:
-            expected_year = today.year
-            expected_season = last_completed_q
-        expected_q_end = pd.Timestamp(
-            expected_year, expected_season * 3, 1) + pd.offsets.MonthEnd(0)
+            # Fallback for newly listed or incomplete years: use latest available year sum.
+            yrow = annual.iloc[-1]
+        eps_y = round(float(yrow["eps_sum"]), 2) if pd.notna(yrow["eps_sum"]) else None
+        eps_y_is_prev = bool(pd.to_datetime(yrow["last_date"]) < latest_eps_date)
 
-        # 最近完整年度 EPS：只要四季都有值即可，不再只看 this_year - 1。
-        eps_last = None
-        eps_y_is_prev = False
-        full_years = []
-        for year, g in df.groupby("year"):
-            seasons = set(g["season"].astype(int).tolist())
-            if {1, 2, 3, 4}.issubset(seasons):
-                full_years.append(int(year))
-        if full_years:
-            annual_year = max(full_years)
-            annual_df = df[df["year"] == annual_year].drop_duplicates(
-                "season", keep="last")
-            eps_last = round(float(annual_df["value"].sum()), 2)
-            # 例如 2026 年應該可用的完整年度通常是 2025；若只回補到 2024，標為前期。
-            eps_y_is_prev = bool(annual_year < today.year - 1)
-
-        # 最近四季 TTM：取最近四個有效 EPS 季度。
-        eps_ttm = None
-        eps_ttm_is_prev = False
-        if len(df) >= 4:
-            latest4 = df.sort_values("date").tail(4)
+        latest4 = eps_df.sort_values("date").tail(4)
+        if len(latest4) >= 4:
             eps_ttm = round(float(latest4["value"].sum()), 2)
-            latest_eps_date = latest4["date"].max()
-            eps_ttm_is_prev = bool(latest_eps_date < expected_q_end)
+            eps_ttm_is_prev = bool(latest4["date"].max() < latest_eps_date)
+        else:
+            eps_ttm = eps_y
+            eps_ttm_is_prev = eps_y_is_prev
 
         def calc_per(price, eps):
             try:
-                price = float(price) if price is not None else None
-            except Exception:
-                price = None
-            return round(price / eps, 2) if price and eps is not None and eps > 0 else None
+                price = float(price)
+                eps = float(eps)
+            except (TypeError, ValueError):
+                return None
+            return round(price / eps, 2) if price > 0 and eps > 0 else None
 
-        per_last = calc_per(current_price, eps_last)
+        per_y = calc_per(current_price, eps_y)
         per_ttm = calc_per(current_price, eps_ttm)
 
-        return eps_last, eps_ttm, per_last, per_ttm, eps_y_is_prev, eps_ttm_is_prev
+        return eps_y, eps_ttm, per_y, per_ttm, eps_y_is_prev, eps_ttm_is_prev
 
     except Exception as e:
         print(f"❌ EPS error {stock_id}: {e}")
         return (None, None, None, None, False, False)
-
 
 def get_dividend_yield(stock_id, current_price=None):
     try:

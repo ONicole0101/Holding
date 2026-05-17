@@ -417,28 +417,23 @@
 
     function fmt(v, suffix = "") {
       if (v === null || v === undefined || v === "" || Number.isNaN(v)) return "-";
-      if (typeof v === "string") {
-        const text = v.trim();
-        if (!text || ["nan", "none", "null"].includes(text.toLowerCase())) return "-";
-        const textNum = Number(text);
-        if (Number.isNaN(textNum)) return text;
-      }
       const num = Number(v);
+      if (Number.isNaN(num)) return String(v);
       if (num === 0) return "0" + suffix;
-      // 判斷是否為整數
       const isInteger = Number.isInteger(num);
       const formatted = isInteger
-        ? num.toLocaleString("en-US")               // 1,234
+        ? num.toLocaleString("en-US")
         : num.toLocaleString("en-US", {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2
-        });                                       // 1,234.5
+        });
       return formatted + suffix;
     }
 
     function fmtPrev(v, isPrev, suffix = "") {
       const base = fmt(v, suffix);
-      return base === "-" ? base : base + (isPrev ? " (前期)" : "");
+      if (base === "-") return base;
+      return isPrev ? `${base} (前期)` : base;
     }
 
     function fmtTrend(v) {
@@ -541,7 +536,7 @@
         null,   // M
         s.gross_margin_qoq,
         s.gross_margin_yoy_diff,
-        "",
+        "%",
         s.gross_margin_is_prev
       )}
         </td>
@@ -553,7 +548,7 @@
         null,   // M,
         s.operating_margin_qoq,
         s.operating_margin_yoy_diff,
-        "",
+        "%",
         s.operating_margin_is_prev
       )}
         </td>
@@ -565,7 +560,7 @@
         null,   // M
         s.net_margin_qoq,
         s.net_margin_yoy_diff,
-        "",
+        "%",
         s.net_margin_is_prev
       )}
         </td>
@@ -649,15 +644,15 @@
           </div>
           <div class="stock-item">
             <div class="stock-label">利率</div>
-            <div class="stock-value">${renderMetric3(s.gross_margin, null, s.gross_margin_qoq, s.gross_margin_yoy_diff, "", s.gross_margin_is_prev)}</div>
+            <div class="stock-value">${renderMetric3(s.gross_margin, null, s.gross_margin_qoq, s.gross_margin_yoy_diff, "%", s.gross_margin_is_prev)}</div>
           </div>
           <div class="stock-item">
             <div class="stock-label">營益率</div>
-            <div class="stock-value">${renderMetric3(s.operating_margin, null, s.operating_margin_qoq, s.operating_margin_yoy_diff, "", s.operating_margin_is_prev)}</div>
+            <div class="stock-value">${renderMetric3(s.operating_margin, null, s.operating_margin_qoq, s.operating_margin_yoy_diff, "%", s.operating_margin_is_prev)}</div>
           </div>
           <div class="stock-item">
             <div class="stock-label">淨利率</div>
-            <div class="stock-value">${renderMetric3(s.net_margin, null, s.net_margin_qoq, s.net_margin_yoy_diff, "", s.net_margin_is_prev)}</div>
+            <div class="stock-value">${renderMetric3(s.net_margin, null, s.net_margin_qoq, s.net_margin_yoy_diff, "%", s.net_margin_is_prev)}</div>
           </div>
           <div class="stock-item">
             <div class="stock-label">日PBR 90天LH</div>
