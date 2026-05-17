@@ -87,6 +87,20 @@ def to_float_or_none(v):
         return None
 
 
+def to_bool(v):
+    if v is None:
+        return False
+    try:
+        if pd.isna(v):
+            return False
+    except Exception:
+        pass
+    if isinstance(v, bool):
+        return v
+    text = str(v).strip().lower()
+    return text in ("1", "true", "t", "yes", "y", "前期")
+
+
 def to_int_or_none(v):
     if v is None:
         return None
@@ -418,6 +432,8 @@ def _build_static_fields(static_row):
         "eps_ttm": to_float_or_none(static_row.get("eps_ttm")),
         "per_Y": to_float_or_none(static_row.get("per_Y")),
         "per_ttm": to_float_or_none(static_row.get("per_ttm")),
+        "eps_Y_is_prev": to_bool(static_row.get("eps_Y_is_prev")),
+        "eps_ttm_is_prev": to_bool(static_row.get("eps_ttm_is_prev")),
         "rev": to_float_or_none(static_row.get("rev")),
         "rev_mom": to_float_or_none(static_row.get("rev_mom")),
         "rev_qoq": to_float_or_none(static_row.get("rev_qoq")),
@@ -426,21 +442,26 @@ def _build_static_fields(static_row):
         "gross_margin": to_float_or_none(static_row.get("gross_margin")),
         "gross_margin_qoq": to_float_or_none(static_row.get("gross_margin_qoq")),
         "gross_margin_yoy_diff": to_float_or_none(static_row.get("gross_margin_yoy_diff")),
+        "gross_margin_is_prev": to_bool(static_row.get("gross_margin_is_prev")),
 
         "operating_margin": to_float_or_none(static_row.get("operating_margin")),
         "operating_margin_qoq": to_float_or_none(static_row.get("operating_margin_qoq")),
         "operating_margin_yoy_diff": to_float_or_none(static_row.get("operating_margin_yoy_diff")),
+        "operating_margin_is_prev": to_bool(static_row.get("operating_margin_is_prev")),
 
         "net_margin": to_float_or_none(static_row.get("net_margin")),
         "net_margin_qoq": to_float_or_none(static_row.get("net_margin_qoq")),
         "net_margin_yoy_diff": to_float_or_none(static_row.get("net_margin_yoy_diff")),
+        "net_margin_is_prev": to_bool(static_row.get("net_margin_is_prev")),
 
         "per_latest": to_float_or_none(static_row.get("per_latest")),
         "per_90d_high": to_float_or_none(static_row.get("per_90d_high")),
         "per_90d_low": to_float_or_none(static_row.get("per_90d_low")),
+        "per_latest_is_prev": to_bool(static_row.get("per_latest_is_prev")),
         "pbr_latest": to_float_or_none(static_row.get("pbr_latest")),
         "pbr_90d_high": to_float_or_none(static_row.get("pbr_90d_high")),
         "pbr_90d_low": to_float_or_none(static_row.get("pbr_90d_low")),
+        "pbr_latest_is_prev": to_bool(static_row.get("pbr_latest_is_prev")),
     }
 
 

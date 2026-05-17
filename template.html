@@ -417,6 +417,12 @@
 
     function fmt(v, suffix = "") {
       if (v === null || v === undefined || v === "" || Number.isNaN(v)) return "-";
+      if (typeof v === "string") {
+        const text = v.trim();
+        if (!text || ["nan", "none", "null"].includes(text.toLowerCase())) return "-";
+        const textNum = Number(text);
+        if (Number.isNaN(textNum)) return text;
+      }
       const num = Number(v);
       if (num === 0) return "0" + suffix;
       // 判斷是否為整數
@@ -428,6 +434,11 @@
           maximumFractionDigits: 2
         });                                       // 1,234.5
       return formatted + suffix;
+    }
+
+    function fmtPrev(v, isPrev, suffix = "") {
+      const base = fmt(v, suffix);
+      return base === "-" ? base : base + (isPrev ? " (前期)" : "");
     }
 
     function fmtTrend(v) {
@@ -446,7 +457,7 @@
       return "";
     }
 
-    function renderMetric3(value, m, q, y, suffix = "") {
+    function renderMetric3(value, m, q, y, suffix = "", isPrev = false) {
       const renderLine = (label, v) => {
         if (isNil(v)) {
           return `<div>${label} -</div>`;
@@ -459,7 +470,7 @@
       };
       return `
   <div class="metric">
-    <div class="table-lv1">${fmt(value, suffix)}</div>
+    <div class="table-lv1">${fmtPrev(value, isPrev, suffix)}</div>
     <div class="metric-sub">
       ${renderLine("M", m)}
       ${renderLine("Q", q)}
@@ -468,10 +479,10 @@
   </div>`;
     }
 
-    function renderRangeMetric(current, low, high, suffix = "", cls = "") {
+    function renderRangeMetric(current, low, high, suffix = "", cls = "", isPrev = false) {
       return `
       <div class="metric metric-2line">
-        <div class="table-lv1 ${cls}">${fmt(current, suffix)}</div>
+        <div class="table-lv1 ${cls}">${fmtPrev(current, isPrev, suffix)}</div>
         <div class="table-lv2">${fmt(low, suffix)}</div>
         <div class="table-lv2">${fmt(high, suffix)}</div>
       </div>`;
@@ -516,8 +527,8 @@
         </td>
 
         <td class="col-lg">
-          <div class="table-lv1">${fmt(s.eps_Y)}</div>
-          <div class="table-lv2">${fmt(s.eps_ttm)}</div>
+          <div class="table-lv1">${fmtPrev(s.eps_Y, s.eps_Y_is_prev)}</div>
+          <div class="table-lv2">${fmtPrev(s.eps_ttm, s.eps_ttm_is_prev)}</div>
         </td>
 
         <!-- 營收 -->
@@ -529,7 +540,9 @@
         s.gross_margin,
         null,   // M
         s.gross_margin_qoq,
-        s.gross_margin_yoy_diff
+        s.gross_margin_yoy_diff,
+        "",
+        s.gross_margin_is_prev
       )}
         </td>
 
@@ -539,7 +552,9 @@
         s.operating_margin,
         null,   // M,
         s.operating_margin_qoq,
-        s.operating_margin_yoy_diff
+        s.operating_margin_yoy_diff,
+        "",
+        s.operating_margin_is_prev
       )}
         </td>
 
@@ -549,14 +564,16 @@
         s.net_margin,
         null,   // M
         s.net_margin_qoq,
-        s.net_margin_yoy_diff
+        s.net_margin_yoy_diff,
+        "",
+        s.net_margin_is_prev
       )}
         </td>
 
         <td class="col-md">${fmt(s.score)}</td>
         <td class="col-md">${fmt(s.yield_value * 0.65, "%")}</td>
-        <td class="col-lg">${renderRangeMetric(s.per_latest, s.per_90d_low, s.per_90d_high)}</td>
-        <td class="col-lg">${renderRangeMetric(s.pbr_latest, s.pbr_90d_low, s.pbr_90d_high)}</td>
+        <td class="col-lg">${renderRangeMetric(s.per_latest, s.per_90d_low, s.per_90d_high, "", "", s.per_latest_is_prev)}</td>
+        <td class="col-lg">${renderRangeMetric(s.pbr_latest, s.pbr_90d_low, s.pbr_90d_high, "", "", s.pbr_latest_is_prev)}</td>
         <td>
           <!-- KD 趨勢 -->
           <div class="table-lv1 ${trendClass(s.kd_score)}">${fmtTrend(s.kd_score)}</div>
@@ -624,7 +641,7 @@
         <div class="stock-grid">
           <div class="stock-item">
             <div class="stock-label">日PER 90天LH</div>
-            <div class="stock-value">${renderRangeMetric(s.per_latest, s.per_90d_low, s.per_90d_high)}</div>
+            <div class="stock-value">${renderRangeMetric(s.per_latest, s.per_90d_low, s.per_90d_high, "", "", s.per_latest_is_prev)}</div>
           </div>
           <div class="stock-item">
             <div class="stock-label">營收</div>
@@ -632,19 +649,19 @@
           </div>
           <div class="stock-item">
             <div class="stock-label">利率</div>
-            <div class="stock-value">${renderMetric3(s.gross_margin, null, s.gross_margin_qoq, s.gross_margin_yoy_diff)}</div>
+            <div class="stock-value">${renderMetric3(s.gross_margin, null, s.gross_margin_qoq, s.gross_margin_yoy_diff, "", s.gross_margin_is_prev)}</div>
           </div>
           <div class="stock-item">
             <div class="stock-label">營益率</div>
-            <div class="stock-value">${renderMetric3(s.operating_margin, null, s.operating_margin_qoq, s.operating_margin_yoy_diff)}</div>
+            <div class="stock-value">${renderMetric3(s.operating_margin, null, s.operating_margin_qoq, s.operating_margin_yoy_diff, "", s.operating_margin_is_prev)}</div>
           </div>
           <div class="stock-item">
             <div class="stock-label">淨利率</div>
-            <div class="stock-value">${renderMetric3(s.net_margin, null, s.net_margin_qoq, s.net_margin_yoy_diff)}</div>
+            <div class="stock-value">${renderMetric3(s.net_margin, null, s.net_margin_qoq, s.net_margin_yoy_diff, "", s.net_margin_is_prev)}</div>
           </div>
           <div class="stock-item">
             <div class="stock-label">日PBR 90天LH</div>
-            <div class="stock-value">${renderRangeMetric(s.pbr_latest, s.pbr_90d_low, s.pbr_90d_high)}</div>
+            <div class="stock-value">${renderRangeMetric(s.pbr_latest, s.pbr_90d_low, s.pbr_90d_high, "", "", s.pbr_latest_is_prev)}</div>
           </div>
           <div class="stock-item">
             <div class="stock-label">日KD 3天趨勢</div>

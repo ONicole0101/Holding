@@ -471,20 +471,21 @@ def get_per_raw(stock_id):
 
 def get_per_pbr_90d_stats(stock_id, days=90):
     """
-    回傳：
-    {
-        "per": 最新PER,
-        "per_90d_high": 90天PER最高,
-        "per_90d_low": 90天PER最低,
-        "pbr": 最新PBR,
-        "pbr_90d_high": 90天PBR最高,
-        "pbr_90d_low": 90天PBR最低,
-    }
+    PER/PBR 90 天統計。
+    最新日若 PER/PBR 是空值，往前找最近一筆有效值，並回傳 *_is_prev 旗標。
     """
+    empty = {
+        "per": None,
+        "per_90d_high": None,
+        "per_90d_low": None,
+        "per_is_prev": False,
+        "pbr": None,
+        "pbr_90d_high": None,
+        "pbr_90d_low": None,
+        "pbr_is_prev": False,
+    }
     try:
-        start_date = (datetime.now() - timedelta(days=days * 2)
-                      ).strftime("%Y-%m-%d")
-        # 抓寬一點，避免遇到非交易日不夠 90 筆
+        start_date = (datetime.now() - timedelta(days=days * 2)).strftime("%Y-%m-%d")
 
         params = {
             "dataset": "TaiwanStockPER",
@@ -494,83 +495,63 @@ def get_per_pbr_90d_stats(stock_id, days=90):
         }
 
         _record_finmind_request("PER/PBR 90D", stock_id, "TaiwanStockPER")
-        res = requests.get(API_URL, params=params,
-                           headers=headers, timeout=300)
+        res = requests.get(API_URL, params=params, headers=headers, timeout=300)
         res_data = _safe_response_json(res)
         _print_initial_quota_once(res_data, res)
 
         if res.status_code != 200:
             _print_api_status_error('PER/PBR 90D', stock_id, res, res_data)
-            return {
-                "per": None,
-                "per_90d_high": None,
-                "per_90d_low": None,
-                "pbr": None,
-                "pbr_90d_high": None,
-                "pbr_90d_low": None,
-            }
+            return empty.copy()
 
         data = res_data.get("data", [])
         if not data:
-            return {
-                "per": None,
-                "per_90d_high": None,
-                "per_90d_low": None,
-                "pbr": None,
-                "pbr_90d_high": None,
-                "pbr_90d_low": None,
-            }
+            return empty.copy()
 
         df = pd.DataFrame(data)
-        df["date"] = pd.to_datetime(df["date"])
-        df = df.sort_values("date").tail(days).copy()
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        df = df.dropna(subset=["date"]).sort_values("date").tail(days).copy()
+        if df.empty:
+            return empty.copy()
 
-        # 用候選欄位名提高相容性
-        per_col = next(
-            (c for c in ["price_to_earning_ratio",
-             "PER", "per"] if c in df.columns),
-            None
-        )
-        pbr_col = next(
-            (c for c in ["price_book_ratio", "PBR", "pbr"] if c in df.columns),
-            None
-        )
-
-        if per_col:
-            df[per_col] = pd.to_numeric(df[per_col], errors="coerce")
-            latest_per = df[per_col].iloc[-1] if not df.empty else None
-            per_high = df[per_col].max()
-            per_low = df[per_col].min()
-        else:
-            latest_per = per_high = per_low = None
-
-        if pbr_col:
-            df[pbr_col] = pd.to_numeric(df[pbr_col], errors="coerce")
-            latest_pbr = df[pbr_col].iloc[-1] if not df.empty else None
-            pbr_high = df[pbr_col].max()
-            pbr_low = df[pbr_col].min()
-        else:
-            latest_pbr = pbr_high = pbr_low = None
+        per_col = next((c for c in ["price_to_earning_ratio", "PER", "per"] if c in df.columns), None)
+        pbr_col = next((c for c in ["price_book_ratio", "PBR", "pbr"] if c in df.columns), None)
+        latest_row_date = df["date"].max()
 
         def safe_round(v):
             return round(float(v), 2) if pd.notna(v) else None
 
+        def latest_valid_stats(col):
+            if not col:
+                return None, None, None, False
+            s = pd.to_numeric(df[col], errors="coerce")
+            valid = df.loc[s.notna(), ["date"]].copy()
+            valid["value"] = s.loc[s.notna()].astype(float)
+            if valid.empty:
+                return None, None, None, False
+            latest_valid_date = valid["date"].max()
+            latest_value = valid.loc[valid["date"] == latest_valid_date, "value"].iloc[-1]
+            return (
+                safe_round(latest_value),
+                safe_round(valid["value"].max()),
+                safe_round(valid["value"].min()),
+                bool(latest_valid_date < latest_row_date),
+            )
+
+        latest_per, per_high, per_low, per_is_prev = latest_valid_stats(per_col)
+        latest_pbr, pbr_high, pbr_low, pbr_is_prev = latest_valid_stats(pbr_col)
+
         return {
-            "per": safe_round(latest_per),
-            "per_90d_high": safe_round(per_high),
-            "per_90d_low": safe_round(per_low),
-            "pbr": safe_round(latest_pbr),
-            "pbr_90d_high": safe_round(pbr_high),
-            "pbr_90d_low": safe_round(pbr_low),
+            "per": latest_per,
+            "per_90d_high": per_high,
+            "per_90d_low": per_low,
+            "per_is_prev": per_is_prev,
+            "pbr": latest_pbr,
+            "pbr_90d_high": pbr_high,
+            "pbr_90d_low": pbr_low,
+            "pbr_is_prev": pbr_is_prev,
         }
 
     except Exception as e:
         print(f"❌ PER/PBR 90D error {stock_id}: {e}")
-        return {
-            "per": None,
-            "per_90d_high": None,
-            "per_90d_low": None,
-            "pbr": None,
-            "pbr_90d_high": None,
-            "pbr_90d_low": None,
-        }
+        return empty.copy()
+

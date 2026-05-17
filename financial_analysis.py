@@ -57,13 +57,18 @@ def build_output(result):
 
 
 def get_profit_ratio(stock_id):
+    """
+    財務三率：用最新可計算資料；若最新公告期缺科目，回補最近一期有效值。
+    回傳 current_is_prev 旗標，讓前端標註「(前期)」。
+    """
     try:
         df = get_profit_ratio_raw(stock_id)
         if df is None or df.empty:
             return None
 
         df['date'] = pd.to_datetime(df['date'])
-        df = df.sort_values('date')
+        df['value'] = pd.to_numeric(df['value'], errors='coerce')
+        df = df.dropna(subset=['date']).sort_values('date')
 
         pivot = df.pivot_table(
             index='date',
@@ -74,42 +79,86 @@ def get_profit_ratio(stock_id):
 
         cols = ['Revenue', 'GrossProfit',
                 'OperatingIncome', 'IncomeAfterTaxes']
-        missing_cols = [c for c in cols if c not in pivot.columns]
-        if missing_cols:
+        for c in cols:
+            if c not in pivot.columns:
+                pivot[c] = pd.NA
+        pivot = pivot[cols].apply(pd.to_numeric, errors='coerce')
+        if pivot.empty:
             return None
 
-        pivot = pivot[cols].dropna()
-        if len(pivot) < 5:
-            return None
+        latest_report_date = pivot.index.max()
 
-        current = pivot.iloc[-1]
-        prev = pivot.iloc[-2]
-        yoy = pivot.iloc[-5]
+        def metric_series(numerator):
+            tmp = pivot[[numerator, 'Revenue']].copy()
+            tmp = tmp.dropna(subset=[numerator, 'Revenue'])
+            tmp = tmp[tmp['Revenue'] > 0]
+            if tmp.empty:
+                return pd.Series(dtype='float64')
+            return (tmp[numerator] / tmp['Revenue'] * 100).round(2)
 
-        def calc(row):
+        def pick_metric(numerator):
+            s = metric_series(numerator)
+            if s.empty:
+                return {
+                    'current': None,
+                    'prev': None,
+                    'yoy': None,
+                    'qoq': None,
+                    'yoy_diff': None,
+                    'is_prev': False,
+                }
+
+            current_date = s.index[-1]
+            current = float(s.iloc[-1])
+            prev = float(s.iloc[-2]) if len(s) >= 2 else None
+            yoy = float(s.iloc[-5]) if len(s) >= 5 else None
+
             return {
-                'gross': safe_margin(row['GrossProfit'], row['Revenue']),
-                'op': safe_margin(row['OperatingIncome'], row['Revenue']),
-                'net': safe_margin(row['IncomeAfterTaxes'], row['Revenue']),
+                'current': current,
+                'prev': prev,
+                'yoy': yoy,
+                'qoq': calc_diff(current, prev),
+                'yoy_diff': calc_diff(current, yoy),
+                'is_prev': bool(current_date < latest_report_date),
             }
 
-        cur_m = calc(current)
-        prev_m = calc(prev)
-        yoy_m = calc(yoy)
+        gross = pick_metric('GrossProfit')
+        op = pick_metric('OperatingIncome')
+        net = pick_metric('IncomeAfterTaxes')
+
+        if all(x['current'] is None for x in [gross, op, net]):
+            return None
 
         return {
-            'current': cur_m,
-            'prev': prev_m,
-            'yoy': yoy_m,
+            'current': {
+                'gross': gross['current'],
+                'op': op['current'],
+                'net': net['current'],
+            },
+            'prev': {
+                'gross': gross['prev'],
+                'op': op['prev'],
+                'net': net['prev'],
+            },
+            'yoy': {
+                'gross': gross['yoy'],
+                'op': op['yoy'],
+                'net': net['yoy'],
+            },
             'qoq': {
-                'gross': calc_diff(cur_m['gross'], prev_m['gross']),
-                'op': calc_diff(cur_m['op'], prev_m['op']),
-                'net': calc_diff(cur_m['net'], prev_m['net']),
+                'gross': gross['qoq'],
+                'op': op['qoq'],
+                'net': net['qoq'],
             },
             'yoy_diff': {
-                'gross': calc_diff(cur_m['gross'], yoy_m['gross']),
-                'op': calc_diff(cur_m['op'], yoy_m['op']),
-                'net': calc_diff(cur_m['net'], yoy_m['net']),
+                'gross': gross['yoy_diff'],
+                'op': op['yoy_diff'],
+                'net': net['yoy_diff'],
+            },
+            'current_is_prev': {
+                'gross': gross['is_prev'],
+                'op': op['is_prev'],
+                'net': net['is_prev'],
             },
         }
     except Exception as e:
@@ -127,160 +176,100 @@ def extract_metric(res, key):
     )
 
 
-def get_eps_analysis(stock_id, current_price):
+def get_eps_analysis(stock_id, current_price=None):
+    """
+    EPS / EPS TTM：不再綁死今年與去年季別。
+    - eps_Y：最近一個四季完整年度 EPS；若不是最近可期待年度，標註前期。
+    - eps_ttm：最近四個有效季 EPS 合計；若最新有效季早於最近已結束季，標註前期。
+    回傳 6 欄：eps_Y, eps_ttm, per_Y, per_ttm, eps_Y_is_prev, eps_ttm_is_prev
+    """
     try:
         data = get_eps_raw(stock_id)
         if not data:
-            return (None,) * 4
+            return (None, None, None, None, False, False)
 
         df = pd.DataFrame(data)
-        df = df[df["type"] == "EPS"]
-        if df.empty:
-            return (None,) * 4
+        if "type" not in df.columns:
+            return (None, None, None, None, False, False)
 
-        df["date"] = pd.to_datetime(df["date"])
+        # FinMind 官方範例 type 為 EPS、origin_name 為「基本每股盈餘」。
+        # 這裡同時支援 origin_name，避免部分資料列中文名稱存在但 type 命名差異造成誤判空白。
+        type_text = df["type"].astype(str).str.strip().str.upper()
+        eps_mask = type_text.eq("EPS")
+        if "origin_name" in df.columns:
+            origin_text = df["origin_name"].astype(str)
+            eps_mask = eps_mask | origin_text.str.contains(
+                "每股盈餘|基本每股盈餘|EPS", case=False, regex=True, na=False)
+
+        df = df[eps_mask].copy()
+        if df.empty:
+            return (None, None, None, None, False, False)
+
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        df["value"] = pd.to_numeric(df["value"], errors="coerce")
+        df = df.dropna(subset=["date", "value"])
+        if df.empty:
+            return (None, None, None, None, False, False)
+
         df["year"] = df["date"].dt.year
         df["season"] = df["date"].dt.quarter
-        df["value"] = pd.to_numeric(df["value"], errors="coerce")
-
         df = (
             df.sort_values("date")
               .drop_duplicates(["year", "season"], keep="last")
               .reset_index(drop=True)
         )
 
-        this_year = datetime.now().year
-        last_year = this_year - 1
+        today = pd.Timestamp(datetime.now().date())
+        last_completed_q = ((today.month - 1) // 3)  # 0~3, 0 代表去年 Q4
+        if last_completed_q == 0:
+            expected_year = today.year - 1
+            expected_season = 4
+        else:
+            expected_year = today.year
+            expected_season = last_completed_q
+        expected_q_end = pd.Timestamp(
+            expected_year, expected_season * 3, 1) + pd.offsets.MonthEnd(0)
 
-        def get_eps(year, season):
-            row = df[(df["year"] == year) & (df["season"] == season)]
-            if row.empty:
-                return None
-            val = row.iloc[-1]["value"]
-            return float(val) if pd.notna(val) else None
-
+        # 最近完整年度 EPS：只要四季都有值即可，不再只看 this_year - 1。
         eps_last = None
-        df_last = df[df["year"] == last_year]
-        if df_last["season"].nunique() == 4:
-            eps_last = round(df_last["value"].sum(), 2)
+        eps_y_is_prev = False
+        full_years = []
+        for year, g in df.groupby("year"):
+            seasons = set(g["season"].astype(int).tolist())
+            if {1, 2, 3, 4}.issubset(seasons):
+                full_years.append(int(year))
+        if full_years:
+            annual_year = max(full_years)
+            annual_df = df[df["year"] == annual_year].drop_duplicates(
+                "season", keep="last")
+            eps_last = round(float(annual_df["value"].sum()), 2)
+            # 例如 2026 年應該可用的完整年度通常是 2025；若只回補到 2024，標為前期。
+            eps_y_is_prev = bool(annual_year < today.year - 1)
 
-        # 用月營收彙總季度營收，來補缺季 EPS
-        rev_map = {}
-        rev_raw = get_revenue_raw(stock_id)
-        if rev_raw:
-            rev_df = pd.DataFrame(rev_raw)
-
-            if not rev_df.empty:
-                if "revenue" not in rev_df.columns and "value" in rev_df.columns:
-                    rev_df["revenue"] = rev_df["value"]
-
-                if "revenue" in rev_df.columns and "date" in rev_df.columns:
-                    rev_df["date"] = pd.to_datetime(rev_df["date"])
-                    rev_df["revenue"] = pd.to_numeric(
-                        rev_df["revenue"], errors="coerce")
-                    rev_df = rev_df.dropna(subset=["date", "revenue"]).copy()
-
-                    rev_df["year"] = rev_df["date"].dt.year
-                    rev_df["quarter"] = rev_df["date"].dt.quarter
-
-                    q_rev = (
-                        rev_df.groupby(["year", "quarter"],
-                                       as_index=False)["revenue"]
-                        .sum()
-                        .sort_values(["year", "quarter"])
-                    )
-
-                    rev_map = {
-                        (int(r["year"]), int(r["quarter"])): float(r["revenue"])
-                        for _, r in q_rev.iterrows()
-                        if pd.notna(r["revenue"])
-                    }
-
-        def get_revenue(year, season):
-            return rev_map.get((year, season))
-
-        def estimate_eps_by_revenue_growth(target_year, target_season):
-            prev_eps = get_eps(target_year - 1, target_season)
-            prev_rev = get_revenue(target_year - 1, target_season)
-            curr_rev = get_revenue(target_year, target_season)
-
-            if prev_eps is None:
-                return None
-
-            # 沒營收資料時，退回去年同季 EPS
-            if prev_rev is None or prev_rev <= 0 or curr_rev is None or curr_rev <= 0:
-                return round(prev_eps, 2)
-            growth_ratio = curr_rev / prev_rev
-            growth_ratio = max(0.5, min(growth_ratio, 1.5))
-            return round(prev_eps * growth_ratio, 2)
-
+        # 最近四季 TTM：取最近四個有效 EPS 季度。
         eps_ttm = None
-        this_year_seasons = sorted(
-            df[df["year"] == this_year]["season"].dropna().astype(
-                int).unique().tolist()
-        )
-
-        if this_year_seasons == []:
-            vals = [
-                get_eps(last_year, 2),
-                get_eps(last_year, 3),
-                get_eps(last_year, 4),
-                estimate_eps_by_revenue_growth(this_year, 1),
-            ]
-            if all(v is not None for v in vals):
-                eps_ttm = round(sum(vals), 2)
-
-        elif this_year_seasons == [1]:
-            vals = [
-                get_eps(last_year, 2),
-                get_eps(last_year, 3),
-                get_eps(last_year, 4),
-                get_eps(this_year, 1),
-            ]
-            if all(v is not None for v in vals):
-                eps_ttm = round(sum(vals), 2)
-
-        elif this_year_seasons == [1, 2]:
-            vals = [
-                get_eps(last_year, 3),
-                get_eps(last_year, 4),
-                get_eps(this_year, 1),
-                get_eps(this_year, 2),
-            ]
-            if all(v is not None for v in vals):
-                eps_ttm = round(sum(vals), 2)
-
-        elif this_year_seasons == [1, 2, 3]:
-            vals = [
-                get_eps(last_year, 4),
-                get_eps(this_year, 1),
-                get_eps(this_year, 2),
-                get_eps(this_year, 3),
-            ]
-            if all(v is not None for v in vals):
-                eps_ttm = round(sum(vals), 2)
-
-        elif this_year_seasons == [1, 2, 3, 4]:
-            vals = [
-                get_eps(this_year, 1),
-                get_eps(this_year, 2),
-                get_eps(this_year, 3),
-                get_eps(this_year, 4),
-            ]
-            if all(v is not None for v in vals):
-                eps_ttm = round(sum(vals), 2)
+        eps_ttm_is_prev = False
+        if len(df) >= 4:
+            latest4 = df.sort_values("date").tail(4)
+            eps_ttm = round(float(latest4["value"].sum()), 2)
+            latest_eps_date = latest4["date"].max()
+            eps_ttm_is_prev = bool(latest_eps_date < expected_q_end)
 
         def calc_per(price, eps):
-            return round(price / eps, 2) if eps is not None and eps > 0 else None
+            try:
+                price = float(price) if price is not None else None
+            except Exception:
+                price = None
+            return round(price / eps, 2) if price and eps is not None and eps > 0 else None
 
         per_last = calc_per(current_price, eps_last)
         per_ttm = calc_per(current_price, eps_ttm)
 
-        return eps_last, eps_ttm, per_last, per_ttm
+        return eps_last, eps_ttm, per_last, per_ttm, eps_y_is_prev, eps_ttm_is_prev
 
     except Exception as e:
         print(f"❌ EPS error {stock_id}: {e}")
-        return (None,) * 4
+        return (None, None, None, None, False, False)
 
 
 def get_dividend_yield(stock_id, current_price=None):
