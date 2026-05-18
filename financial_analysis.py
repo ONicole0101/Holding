@@ -69,6 +69,9 @@ def _metric_name_mask(df: pd.DataFrame, names: list[str]):
 
 
 def _standardize_financial_df(data) -> pd.DataFrame:
+    print("=== Standardize Fn Called: Raw Data ===")
+    print(data)
+    print("=======================================")
     df = data.copy() if isinstance(data, pd.DataFrame) else pd.DataFrame(data or [])
     if df.empty or "date" not in df.columns or "value" not in df.columns:
         return pd.DataFrame()
