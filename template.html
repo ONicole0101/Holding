@@ -302,6 +302,86 @@
       line-height: 1.5;
     }
 
+
+    .filter-panel {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: end;
+      gap: 8px;
+      margin: 10px 0 14px;
+      padding: 10px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+    }
+
+    .filter-title {
+      width: 100%;
+      color: #8b949e;
+      font-size: 12px;
+      margin-bottom: 2px;
+    }
+
+    .filter-item {
+      display: grid;
+      grid-template-columns: auto 44px 82px;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+    }
+
+    .filter-item label {
+      color: #c9d1d9;
+      white-space: nowrap;
+    }
+
+    .filter-item select,
+    .filter-item input {
+      height: 26px;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      background: #0d1117;
+      color: #e6edf3;
+      padding: 2px 6px;
+      font-size: 12px;
+    }
+
+    .filter-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+    }
+
+    .filter-actions button {
+      height: 28px;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      background: #238636;
+      color: #fff;
+      padding: 2px 10px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .filter-actions button.secondary {
+      background: #21262d;
+    }
+
+    .filter-count {
+      color: #8b949e;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .col-volume {
+      width: 76px;
+      min-width: 76px;
+      max-width: 82px;
+      padding-left: 4px;
+      padding-right: 4px;
+    }
+
     @media (max-width: 1024px) {
       .container {
         padding: 12px;
@@ -360,11 +440,23 @@
     <p>{{ report_subtitle }}</p>
     <p>產生時間：{{ generated_time }}</p>
 
-    <div class="summary">
-      <div class="box buy"><b id="buyCount"></b><br>買入</div>
-      <div class="box sell"><b id="sellCount"></b><br>出貨</div>
-      <div class="box watch"><b id="watchCount"></b><br>觀察</div>
-      <div class="box hold"><b id="holdCount"></b><br>整理</div>
+    <div class="filter-panel" id="filterPanel">
+      <div class="filter-title">篩選條件：可多條件累積篩選；輸入即時更新，也可按「套用」。</div>
+      <div class="filter-item"><label>價格</label><select data-filter-op="price"><option value=">">&gt;</option><option value="<">&lt;</option></select><input data-filter-key="price" type="number" step="0.01" placeholder="數值"></div>
+      <div class="filter-item"><label>漲跌%</label><select data-filter-op="chgPct"><option value=">">&gt;</option><option value="<">&lt;</option></select><input data-filter-key="chgPct" type="number" step="0.01" placeholder="數值"></div>
+      <div class="filter-item"><label>EPS</label><select data-filter-op="eps_Y"><option value=">">&gt;</option><option value="<">&lt;</option></select><input data-filter-key="eps_Y" type="number" step="0.01" placeholder="數值"></div>
+      <div class="filter-item"><label>毛利率</label><select data-filter-op="gross_margin"><option value=">">&gt;</option><option value="<">&lt;</option></select><input data-filter-key="gross_margin" type="number" step="0.01" placeholder="數值"></div>
+      <div class="filter-item"><label>日KD</label><select data-filter-op="k"><option value=">">&gt;</option><option value="<">&lt;</option></select><input data-filter-key="k" type="number" step="0.01" placeholder="數值"></div>
+      <div class="filter-item"><label>日布林%</label><select data-filter-op="bb_pct"><option value=">">&gt;</option><option value="<">&lt;</option></select><input data-filter-key="bb_pct" type="number" step="0.01" placeholder="數值"></div>
+      <div class="filter-item"><label>日Bbias6</label><select data-filter-op="bias6"><option value=">">&gt;</option><option value="<">&lt;</option></select><input data-filter-key="bias6" type="number" step="0.01" placeholder="數值"></div>
+      <div class="filter-item"><label>日Bbias18</label><select data-filter-op="bias18"><option value=">">&gt;</option><option value="<">&lt;</option></select><input data-filter-key="bias18" type="number" step="0.01" placeholder="數值"></div>
+      <div class="filter-item"><label>日成交量</label><select data-filter-op="volume"><option value=">">&gt;</option><option value="<">&lt;</option></select><input data-filter-key="volume" type="number" step="1" placeholder="張數"></div>
+      <div class="filter-item"><label>日增量%</label><select data-filter-op="volume_ratio"><option value=">">&gt;</option><option value="<">&lt;</option></select><input data-filter-key="volume_ratio" type="number" step="0.01" placeholder="數值"></div>
+      <div class="filter-actions">
+        <button type="button" id="applyFilterBtn">套用</button>
+        <button type="button" class="secondary" id="clearFilterBtn">清除</button>
+        <span class="filter-count" id="filterCount"></span>
+      </div>
     </div>
 
     <div class="card">
@@ -377,12 +469,12 @@
               <th data-key="price">價格<br><small>90天LH</small></th>
               <th data-key="chg">漲跌<br><small>LH</small></th>
               <th data-key="chgPct">漲跌%<br><small>震幅%</small></th>
+              <th class="col-volume" data-key="volume">量<br><small>昨/增/張</small></th>
               <th class="col-lg" data-key="eps_Y">EPS<br><small>TTM</small></th>
               <th class="col-lg" data-key="rev">營收(bn)<br><small>M / Q / Y</small></th>
               <th class="col-lg" data-key="gross_margin">毛利率%<br><small>QoQ / YoY</small></th>
               <th class="col-lg" data-key="operating_margin">營益率%<br><small>QoQ / YoY</small></th>
               <th class="col-lg" data-key="net_margin">淨利率%<br><small>QoQ / Y</small></th>
-              <th class="col-md" data-key="score">評分</th>
               <th class="col-md" data-key="yield_value">殖利率<br><small>估65%</small></th>
               <th class="col-lg" data-key="per_latest">日PER<br><small>90天LH</small></th>
               <th class="col-lg" data-key="pbr_latest">日PBR<br><small>90天LH</small></th>
@@ -391,8 +483,6 @@
               <th class="col-lg" data-key="bias6">日Bias6<br><small>LH</small></th>
               <th class="col-lg" data-key="bias18">日Bias18<br><small>LH</small></th>
               <th class="col-lg" data-key="bias50">日Bias50<br><small>LH</small></th>
-              <th class="col-md" data-key="volume">日成交量<br><small>昨量</small></th>
-              <th class="col-md" data-key="volume_ratio">日量增%</th>
               <th data-key="sig">訊號</th>
             </tr>
           </thead>
@@ -407,7 +497,8 @@
 
   <script>
     const stocks = {{ stocks | tojson }};
-    let sortedStocks = Array.isArray(stocks) ? [...stocks] : [];
+    const baseStocks = Array.isArray(stocks) ? [...stocks] : [];
+    let sortedStocks = [...baseStocks];
     let currentSortKey = "";
     let currentSortDirection = "asc";
 
@@ -418,22 +509,16 @@
     function fmt(v, suffix = "") {
       if (v === null || v === undefined || v === "" || Number.isNaN(v)) return "-";
       const num = Number(v);
-      if (Number.isNaN(num)) return String(v);
       if (num === 0) return "0" + suffix;
+      // 判斷是否為整數
       const isInteger = Number.isInteger(num);
       const formatted = isInteger
-        ? num.toLocaleString("en-US")
+        ? num.toLocaleString("en-US")               // 1,234
         : num.toLocaleString("en-US", {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2
-        });
+        });                                       // 1,234.5
       return formatted + suffix;
-    }
-
-    function fmtPrev(v, isPrev, suffix = "") {
-      const base = fmt(v, suffix);
-      if (base === "-") return base;
-      return isPrev ? `${base} (前期)` : base;
     }
 
     function fmtTrend(v) {
@@ -452,7 +537,7 @@
       return "";
     }
 
-    function renderMetric3(value, m, q, y, suffix = "", isPrev = false) {
+    function renderMetric3(value, m, q, y, suffix = "") {
       const renderLine = (label, v) => {
         if (isNil(v)) {
           return `<div>${label} -</div>`;
@@ -465,7 +550,7 @@
       };
       return `
   <div class="metric">
-    <div class="table-lv1">${fmtPrev(value, isPrev, suffix)}</div>
+    <div class="table-lv1">${fmt(value, suffix)}</div>
     <div class="metric-sub">
       ${renderLine("M", m)}
       ${renderLine("Q", q)}
@@ -474,10 +559,10 @@
   </div>`;
     }
 
-    function renderRangeMetric(current, low, high, suffix = "", cls = "", isPrev = false) {
+    function renderRangeMetric(current, low, high, suffix = "", cls = "") {
       return `
       <div class="metric metric-2line">
-        <div class="table-lv1 ${cls}">${fmtPrev(current, isPrev, suffix)}</div>
+        <div class="table-lv1 ${cls}">${fmt(current, suffix)}</div>
         <div class="table-lv2">${fmt(low, suffix)}</div>
         <div class="table-lv2">${fmt(high, suffix)}</div>
       </div>`;
@@ -521,9 +606,16 @@
           <div class="table-lv2">${fmt(s.amp, "%")}</div>
         </td>
 
+        <td class="col-volume">
+          <div class="table-lv1">${fmt(s.volume)}</div>
+          <div class="table-lv2">昨 ${fmt(s.prev_volume)}</div>
+          <div class="table-lv2 ${trendClass(s.volume_ratio)}">${isNil(s.volume_ratio) ? "-" : `${fmtTrend(s.volume_ratio)}${fmt(s.volume_ratio, "%")}`}</div>
+          <div class="table-lv3">${isNil(s.volume_add) ? "-" : `${fmt(s.volume_add)}張`}</div>
+        </td>
+
         <td class="col-lg">
-          <div class="table-lv1">${fmtPrev(s.eps_Y, s.eps_Y_is_prev)}</div>
-          <div class="table-lv2">${fmtPrev(s.eps_ttm, s.eps_ttm_is_prev)}</div>
+          <div class="table-lv1">${fmt(s.eps_Y)}</div>
+          <div class="table-lv2">${fmt(s.eps_ttm)}</div>
         </td>
 
         <!-- 營收 -->
@@ -535,9 +627,7 @@
         s.gross_margin,
         null,   // M
         s.gross_margin_qoq,
-        s.gross_margin_yoy_diff,
-        "%",
-        s.gross_margin_is_prev
+        s.gross_margin_yoy_diff
       )}
         </td>
 
@@ -547,9 +637,7 @@
         s.operating_margin,
         null,   // M,
         s.operating_margin_qoq,
-        s.operating_margin_yoy_diff,
-        "%",
-        s.operating_margin_is_prev
+        s.operating_margin_yoy_diff
       )}
         </td>
 
@@ -559,16 +647,13 @@
         s.net_margin,
         null,   // M
         s.net_margin_qoq,
-        s.net_margin_yoy_diff,
-        "%",
-        s.net_margin_is_prev
+        s.net_margin_yoy_diff
       )}
         </td>
 
-        <td class="col-md">${fmt(s.score)}</td>
         <td class="col-md">${fmt(s.yield_value * 0.65, "%")}</td>
-        <td class="col-lg">${renderRangeMetric(s.per_latest, s.per_90d_low, s.per_90d_high, "", "", s.per_latest_is_prev)}</td>
-        <td class="col-lg">${renderRangeMetric(s.pbr_latest, s.pbr_90d_low, s.pbr_90d_high, "", "", s.pbr_latest_is_prev)}</td>
+        <td class="col-lg">${renderRangeMetric(s.per_latest, s.per_90d_low, s.per_90d_high)}</td>
+        <td class="col-lg">${renderRangeMetric(s.pbr_latest, s.pbr_90d_low, s.pbr_90d_high)}</td>
         <td>
           <!-- KD 趨勢 -->
           <div class="table-lv1 ${trendClass(s.kd_score)}">${fmtTrend(s.kd_score)}</div>
@@ -592,16 +677,6 @@
 
         <td class="col-lg">
           ${renderRangeMetric(s.bias50, s.bias50_min, s.bias50_max, "%", distClass(s.bias50))}
-        </td>
-             
-        <td class="col-md">
-          <div class="table-lv1">${fmt(s.volume)}</div>
-          <div class="table-lv2">昨: ${fmt(s.prev_volume)}</div>
-        </td>
-
-        <td class="col-md ${trendClass(s.volume_ratio)}">
-          <div class="table-lv1">${isNil(s.volume_ratio) ? "-" : `${fmtTrend(s.volume_ratio)} ${fmt(s.volume_ratio, "%")}`}</div>
-          <div class="table-lv2">${isNil(s.volume_add) ? "-" : `${fmt(s.volume_add)} 張`}</div>
         </td>
 
         <td class="signal-cell">
@@ -636,7 +711,7 @@
         <div class="stock-grid">
           <div class="stock-item">
             <div class="stock-label">日PER 90天LH</div>
-            <div class="stock-value">${renderRangeMetric(s.per_latest, s.per_90d_low, s.per_90d_high, "", "", s.per_latest_is_prev)}</div>
+            <div class="stock-value">${renderRangeMetric(s.per_latest, s.per_90d_low, s.per_90d_high)}</div>
           </div>
           <div class="stock-item">
             <div class="stock-label">營收</div>
@@ -644,19 +719,19 @@
           </div>
           <div class="stock-item">
             <div class="stock-label">利率</div>
-            <div class="stock-value">${renderMetric3(s.gross_margin, null, s.gross_margin_qoq, s.gross_margin_yoy_diff, "%", s.gross_margin_is_prev)}</div>
+            <div class="stock-value">${renderMetric3(s.gross_margin, null, s.gross_margin_qoq, s.gross_margin_yoy_diff)}</div>
           </div>
           <div class="stock-item">
             <div class="stock-label">營益率</div>
-            <div class="stock-value">${renderMetric3(s.operating_margin, null, s.operating_margin_qoq, s.operating_margin_yoy_diff, "%", s.operating_margin_is_prev)}</div>
+            <div class="stock-value">${renderMetric3(s.operating_margin, null, s.operating_margin_qoq, s.operating_margin_yoy_diff)}</div>
           </div>
           <div class="stock-item">
             <div class="stock-label">淨利率</div>
-            <div class="stock-value">${renderMetric3(s.net_margin, null, s.net_margin_qoq, s.net_margin_yoy_diff, "%", s.net_margin_is_prev)}</div>
+            <div class="stock-value">${renderMetric3(s.net_margin, null, s.net_margin_qoq, s.net_margin_yoy_diff)}</div>
           </div>
           <div class="stock-item">
             <div class="stock-label">日PBR 90天LH</div>
-            <div class="stock-value">${renderRangeMetric(s.pbr_latest, s.pbr_90d_low, s.pbr_90d_high, "", "", s.pbr_latest_is_prev)}</div>
+            <div class="stock-value">${renderRangeMetric(s.pbr_latest, s.pbr_90d_low, s.pbr_90d_high)}</div>
           </div>
           <div class="stock-item">
             <div class="stock-label">日KD 3天趨勢</div>
@@ -696,20 +771,12 @@
           </div>
           
           <div class="stock-item">
-            <div class="stock-label">日成交量</div>
+            <div class="stock-label">量 / 昨 / 增 / 張</div>
             <div class="stock-value">
               <div>${fmt(s.volume)} 張</div>
-              <div class="table-lv2">昨: ${fmt(s.prev_volume)}</div>
-            </div>
-          </div>
-
-          <div class="stock-item">
-            <div class="stock-label">日量增%</div>
-            <div class="stock-value">
-              <div class="${(s.volume_ratio ?? 0) > 0 ? 'up' : 'dn'}">
-                ${fmt(s.volume_ratio, "%")}
-              </div>
-              <div class="table-lv2">${fmt(s.volume_add)} 張</div>
+              <div class="table-lv2">昨 ${fmt(s.prev_volume)}</div>
+              <div class="table-lv2 ${trendClass(s.volume_ratio)}">${isNil(s.volume_ratio) ? "-" : `${fmtTrend(s.volume_ratio)} ${fmt(s.volume_ratio, "%")}`}</div>
+              <div class="table-lv2">${isNil(s.volume_add) ? "-" : `${fmt(s.volume_add)} 張`}</div>
             </div>
           </div>
 
@@ -747,7 +814,6 @@
           return Number(s.sig ?? -999999);
         case "yield_value":
           return Number(((s.yield_value ?? 0) * 0.65).toFixed(4));
-        case "score":
         case "per_latest":
         case "pbr_latest":
           return Number(s[key] ?? -999999);
@@ -767,10 +833,15 @@
         currentSortKey = key;
         currentSortDirection = "asc";
       }
+      sortCurrentRows();
+      renderAll();
+    }
 
+    function sortCurrentRows() {
+      if (!currentSortKey) return;
       sortedStocks.sort((a, b) => {
-        const aVal = getSortValue(a, key);
-        const bVal = getSortValue(b, key);
+        const aVal = getSortValue(a, currentSortKey);
+        const bVal = getSortValue(b, currentSortKey);
         const bothNumbers = typeof aVal === "number" && typeof bVal === "number";
 
         if (bothNumbers) {
@@ -780,10 +851,14 @@
         const result = String(aVal).localeCompare(String(bVal), "zh-Hant");
         return currentSortDirection === "asc" ? result : -result;
       });
+    }
 
+    function renderAll() {
       renderTable(sortedStocks);
       renderMobileCards(sortedStocks);
       updateSortIndicators();
+      const countEl = document.getElementById("filterCount");
+      if (countEl) countEl.innerText = `顯示 ${sortedStocks.length} / ${baseStocks.length} 筆`;
     }
 
     function updateSortIndicators() {
@@ -810,23 +885,61 @@
     }
 
 
-    const buy = sortedStocks.filter(s => s?.signal === "買進").length;
-    const sell = sortedStocks.filter(s => s?.signal === "賣出").length;
-    const watch = sortedStocks.filter(s => s?.signal === "等待觀察").length;
-    const hold = sortedStocks.filter(
-      s => s?.signal === "觀察再買進" || s?.signal === "觀察再賣出").length;
+    function getNumericValue(s, key) {
+      const value = s?.[key];
+      if (isNil(value) || value === "") return null;
+      const num = Number(value);
+      return Number.isNaN(num) ? null : num;
+    }
 
+    function passesFilters(s) {
+      const inputs = document.querySelectorAll("[data-filter-key]");
+      for (const input of inputs) {
+        const raw = String(input.value ?? "").trim();
+        if (raw === "") continue;
 
+        const key = input.dataset.filterKey;
+        const target = Number(raw);
+        const value = getNumericValue(s, key);
+        const opEl = document.querySelector(`[data-filter-op="${key}"]`);
+        const op = opEl ? opEl.value : ">";
 
+        if (Number.isNaN(target) || value === null) return false;
+        if (op === ">" && !(value > target)) return false;
+        if (op === "<" && !(value < target)) return false;
+      }
+      return true;
+    }
 
-    renderTable(sortedStocks);
-    renderMobileCards(sortedStocks);
+    function applyFilters() {
+      sortedStocks = baseStocks.filter(passesFilters);
+      sortCurrentRows();
+      renderAll();
+    }
+
+    function clearFilters() {
+      document.querySelectorAll("[data-filter-key]").forEach(input => input.value = "");
+      document.querySelectorAll("[data-filter-op]").forEach(select => select.value = ">");
+      applyFilters();
+    }
+
+    function bindFilters() {
+      document.querySelectorAll("[data-filter-key]").forEach(input => {
+        input.addEventListener("input", applyFilters);
+        input.addEventListener("change", applyFilters);
+      });
+      document.querySelectorAll("[data-filter-op]").forEach(select => {
+        select.addEventListener("change", applyFilters);
+      });
+      const applyBtn = document.getElementById("applyFilterBtn");
+      const clearBtn = document.getElementById("clearFilterBtn");
+      if (applyBtn) applyBtn.addEventListener("click", applyFilters);
+      if (clearBtn) clearBtn.addEventListener("click", clearFilters);
+    }
+
     bindSorting();
-
-    document.getElementById("buyCount").innerText = buy;
-    document.getElementById("sellCount").innerText = sell;
-    document.getElementById("watchCount").innerText = watch;
-    document.getElementById("holdCount").innerText = hold;
+    bindFilters();
+    renderAll();
   </script>
 
 </body>
