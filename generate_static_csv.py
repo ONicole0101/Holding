@@ -9,7 +9,7 @@ import config
 
 from data_sources import (
     get_revenue_raw,
-    get_per_pbr_90d_stats,
+    get_per_pbr_60d_stats,
     get_finmind_user_info,
     get_finmind_token_status,
     log_finmind_static_event,
@@ -27,13 +27,13 @@ DATA_COLS = [
     "gross_margin", "gross_margin_qoq", "gross_margin_yoy_diff",
     "operating_margin", "operating_margin_qoq", "operating_margin_yoy_diff",
     "net_margin", "net_margin_qoq", "net_margin_yoy_diff",
-    "per_latest", "per_90d_high", "per_90d_low",
-    "pbr_latest", "pbr_90d_high", "pbr_90d_low",
+    "per_latest", "per_60d_high", "per_60d_low",
+    "pbr_latest", "pbr_60d_high", "pbr_60d_low",
 ]
 
 GROUPS = {
     # Required fields for status. Optional derived fields such as per_Y/per_ttm,
-    # QoQ/YoY and 90D high/low should not make a row look empty.
+    # QoQ/YoY and 60D high/low should not make a row look empty.
     "eps": ["eps_Y", "eps_ttm"],
     "revenue": ["rev"],
     "profit": ["gross_margin", "operating_margin", "net_margin"],
@@ -438,15 +438,15 @@ def build_static_row(s: dict) -> dict:
             return finalize_static_status(row)
         set_group_status(row, "profit", "error", str(e))
 
-    # 90-day PER/PBR.
+    # 60-day PER/PBR.
     try:
-        per_pbr = get_per_pbr_90d_stats(stock_id) or {}
+        per_pbr = get_per_pbr_60d_stats(stock_id) or {}
         row["per_latest"] = per_pbr.get("per")
-        row["per_90d_high"] = per_pbr.get("per_90d_high")
-        row["per_90d_low"] = per_pbr.get("per_90d_low")
+        row["per_60d_high"] = per_pbr.get("per_60d_high")
+        row["per_60d_low"] = per_pbr.get("per_60d_low")
         row["pbr_latest"] = per_pbr.get("pbr")
-        row["pbr_90d_high"] = per_pbr.get("pbr_90d_high")
-        row["pbr_90d_low"] = per_pbr.get("pbr_90d_low")
+        row["pbr_60d_high"] = per_pbr.get("pbr_60d_high")
+        row["pbr_60d_low"] = per_pbr.get("pbr_60d_low")
         row["per_latest_is_prev"] = "True" if per_pbr.get("per_is_prev") else "False"
         row["pbr_latest_is_prev"] = "True" if per_pbr.get("pbr_is_prev") else "False"
         if all_blank(row, GROUPS["valuation"]):

@@ -478,7 +478,7 @@ def get_per_raw(stock_id):
         return []
 
 
-def get_per_pbr_90d_stats(stock_id, days=90):
+def get_per_pbr_60d_stats(stock_id, days=60):
     """
     Latest valid PER/PBR plus rolling high/low.
     If the newest FinMind row has blank PER/PBR, walk backward to the newest valid value.
@@ -492,8 +492,8 @@ def get_per_pbr_90d_stats(stock_id, days=90):
             return None
 
     empty = {
-        "per": None, "per_90d_high": None, "per_90d_low": None, "per_is_prev": False,
-        "pbr": None, "pbr_90d_high": None, "pbr_90d_low": None, "pbr_is_prev": False,
+        "per": None, "per_60d_high": None, "per_60d_low": None, "per_is_prev": False,
+        "pbr": None, "pbr_60d_high": None, "pbr_60d_low": None, "pbr_is_prev": False,
     }
 
     try:
@@ -503,13 +503,13 @@ def get_per_pbr_90d_stats(stock_id, days=90):
             "start_date": (datetime.today() - timedelta(days=max(days * 3, 240))).strftime("%Y-%m-%d"),
             "token": FINMIND_token,
         }
-        _record_finmind_request("PER/PBR 90D", stock_id, "TaiwanStockPER")
+        _record_finmind_request("PER/PBR 60D", stock_id, "TaiwanStockPER")
         res = requests.get(API_URL, params=params, headers=headers, timeout=300)
         res_data = _safe_response_json(res)
         _print_initial_quota_once(res_data, res)
 
         if res.status_code != 200:
-            _print_api_status_error('PER/PBR 90D', stock_id, res, res_data)
+            _print_api_status_error('PER/PBR 60D', stock_id, res, res_data)
             return empty
 
         data = res_data.get("data", [])
@@ -563,15 +563,15 @@ def get_per_pbr_90d_stats(stock_id, days=90):
 
         return {
             "per": per,
-            "per_90d_high": per_high if per_high is not None else per,
-            "per_90d_low": per_low if per_low is not None else per,
+            "per_60d_high": per_high if per_high is not None else per,
+            "per_60d_low": per_low if per_low is not None else per,
             "per_is_prev": per_is_prev,
             "pbr": pbr,
-            "pbr_90d_high": pbr_high if pbr_high is not None else pbr,
-            "pbr_90d_low": pbr_low if pbr_low is not None else pbr,
+            "pbr_60d_high": pbr_high if pbr_high is not None else pbr,
+            "pbr_60d_low": pbr_low if pbr_low is not None else pbr,
             "pbr_is_prev": pbr_is_prev,
         }
     except Exception as e:
-        print(f"❌ PER/PBR 90D error {stock_id}: {e}")
+        print(f"❌ PER/PBR 60D error {stock_id}: {e}")
         return empty
 
