@@ -18,20 +18,20 @@ _STATIC_MAP_CACHE = None
 _STATIC_MAP_MTIME = None
 
 
-def get_price_90d_high_low(df):
-    df_90 = df.tail(90)
-    max_price90 = pd.to_numeric(df_90["max"], errors="coerce").max()
-    min_price90 = pd.to_numeric(df_90["min"], errors="coerce").min()
+def get_price_60d_high_low(df):
+    df_60 = df.tail(60)
+    max_price60 = pd.to_numeric(df_60["max"], errors="coerce").max()
+    min_price60 = pd.to_numeric(df_60["min"], errors="coerce").min()
 
-    if pd.isna(max_price90) or pd.isna(min_price90):
+    if pd.isna(max_price60) or pd.isna(min_price60):
         return {
-            "price_90d_high": None,
-            "price_90d_low": None,
+            "price_60d_high": None,
+            "price_60d_low": None,
         }
 
     return {
-        "price_90d_high": float(max_price90),
-        "price_90d_low": float(min_price90),
+        "price_60d_high": float(max_price60),
+        "price_60d_low": float(min_price60),
     }
 
 
@@ -145,19 +145,19 @@ def process_stock(s, static_map=None):
             x.update(_build_static_fields(static_row))
             return x
 
-        if len(df) < 90:
+        if len(df) < 60:
             x = base.copy()
             x.update({
                 "signal": "資料不足",
                 "signal_text": "資料不足",
-                "reason": f"歷史資料不足90日，僅有 {len(df)} 筆",
+                "reason": f"歷史資料不足60日，僅有 {len(df)} 筆",
             })
             x.update(_build_static_fields(static_row))
             return x
 
         df = add_indicators(df)
         latest, prev = df.iloc[-1], df.iloc[-2]
-        price_stats = get_price_90d_high_low(df)
+        price_stats = get_price_60d_high_low(df)
         max_price = latest["max"]
         min_price = latest["min"]
         chg = latest["close"] - prev["close"]
@@ -243,17 +243,17 @@ def process_stock(s, static_map=None):
         bias18 = safe_ma_stats.get("bias18")
         bias50 = safe_ma_stats.get("bias50")
         bias6_min = safe_ma_stats.get(
-            "bias6_90d_low") or safe_ma_stats.get("bias6_min")
+            "bias6_60d_low") or safe_ma_stats.get("bias6_min")
         bias6_max = safe_ma_stats.get(
-            "bias6_90d_high") or safe_ma_stats.get("bias6_max")
+            "bias6_60d_high") or safe_ma_stats.get("bias6_max")
         bias18_min = safe_ma_stats.get(
-            "bias18_90d_low") or safe_ma_stats.get("bias18_min")
+            "bias18_60d_low") or safe_ma_stats.get("bias18_min")
         bias18_max = safe_ma_stats.get(
-            "bias18_90d_high") or safe_ma_stats.get("bias18_max")
+            "bias18_60d_high") or safe_ma_stats.get("bias18_max")
         bias50_min = safe_ma_stats.get(
-            "bias50_90d_low") or safe_ma_stats.get("bias50_min")
+            "bias50_60d_low") or safe_ma_stats.get("bias50_min")
         bias50_max = safe_ma_stats.get(
-            "bias50_90d_high") or safe_ma_stats.get("bias50_max")
+            "bias50_60d_high") or safe_ma_stats.get("bias50_max")
 
         try:
             signal_res = get_tech_signal(
@@ -345,8 +345,8 @@ def process_stock(s, static_map=None):
             "price": float(round(close, 2)),
             "price_max": float(round(max_price, 2)),
             "price_min": float(round(min_price, 2)),
-            "price_90d_high": price_stats.get("price_90d_high"),
-            "price_90d_low": price_stats.get("price_90d_low"),
+            "price_60d_high": price_stats.get("price_60d_high"),
+            "price_60d_low": price_stats.get("price_60d_low"),
             "chg": float(round(chg, 2)),
             "chgPct": float(chgPct),
             "amp": float(amp),
@@ -436,11 +436,11 @@ def _build_static_fields(static_row):
         "net_margin_yoy_diff": to_float_or_none(static_row.get("net_margin_yoy_diff")),
 
         "per_latest": to_float_or_none(static_row.get("per_latest")),
-        "per_90d_high": to_float_or_none(static_row.get("per_90d_high")),
-        "per_90d_low": to_float_or_none(static_row.get("per_90d_low")),
+        "per_60d_high": to_float_or_none(static_row.get("per_60d_high")),
+        "per_60d_low": to_float_or_none(static_row.get("per_60d_low")),
         "pbr_latest": to_float_or_none(static_row.get("pbr_latest")),
-        "pbr_90d_high": to_float_or_none(static_row.get("pbr_90d_high")),
-        "pbr_90d_low": to_float_or_none(static_row.get("pbr_90d_low")),
+        "pbr_60d_high": to_float_or_none(static_row.get("pbr_60d_high")),
+        "pbr_60d_low": to_float_or_none(static_row.get("pbr_60d_low")),
     }
 
 

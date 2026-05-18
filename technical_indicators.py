@@ -23,12 +23,12 @@ def add_indicators(df):
         df['BIAS18'] = (df['close'] - df['MA18']) / df['MA18'] * 100
         df['BIAS50'] = (df['close'] - df['MA50']) / df['MA50'] * 100
 
-        df['BIAS6_90D_HIGH'] = df['BIAS6'].rolling(90, min_periods=30).max()
-        df['BIAS6_90D_LOW'] = df['BIAS6'].rolling(90, min_periods=30).min()
-        df['BIAS18_90D_HIGH'] = df['BIAS18'].rolling(90, min_periods=30).max()
-        df['BIAS18_90D_LOW'] = df['BIAS18'].rolling(90, min_periods=30).min()
-        df['BIAS50_90D_HIGH'] = df['BIAS50'].rolling(90, min_periods=30).max()
-        df['BIAS50_90D_LOW'] = df['BIAS50'].rolling(90, min_periods=30).min()
+        df['BIAS6_60D_HIGH'] = df['BIAS6'].rolling(60, min_periods=30).max()
+        df['BIAS6_60D_LOW'] = df['BIAS6'].rolling(60, min_periods=30).min()
+        df['BIAS18_60D_HIGH'] = df['BIAS18'].rolling(60, min_periods=30).max()
+        df['BIAS18_60D_LOW'] = df['BIAS18'].rolling(60, min_periods=30).min()
+        df['BIAS50_60D_HIGH'] = df['BIAS50'].rolling(60, min_periods=30).max()
+        df['BIAS50_60D_LOW'] = df['BIAS50'].rolling(60, min_periods=30).min()
 
         return df
     except Exception as e:
@@ -65,6 +65,8 @@ def get_kd_trend(df):
         # Sample === k_vals[0]   # [0]三天前
         # Sample === k_vals[1]   # [1]前一天
         # Sample === k_vals[2]   # [2]最新一天
+        k_up = k_vals[2] > k_vals[1] > k_vals[0]
+        k_down = k_vals[2] < k_vals[1] < k_vals[0]
         k_up = k_vals[2] > k_vals[1] > k_vals[0]
         k_down = k_vals[2] < k_vals[1] < k_vals[0]
 
@@ -107,7 +109,7 @@ def get_kd_trend(df):
 
 
 def get_MABias(df):
-    if len(df) < 90:
+    if len(df) < 60:
         return {
             'ma6': None, 'ma18': None, 'ma50': None,
             'bias6': None, 'bias18': None, 'bias50': None,
@@ -132,14 +134,14 @@ def get_MABias(df):
 
         bias_series = (df['close'] - ma_series) / ma_series * 100
         latest_bias = bias_series.iloc[-1]
-        bias_90 = bias_series.iloc[-90:]
+        bias_60 = bias_series.iloc[-60:]
 
         stats[f'bias{p}'] = round(
             latest_bias, 2) if pd.notna(latest_bias) else None
         stats[f'bias{p}_min'] = round(
-            bias_90.min(), 2) if bias_90.notna().any() else None
+            bias_60.min(), 2) if bias_60.notna().any() else None
         stats[f'bias{p}_max'] = round(
-            bias_90.max(), 2) if bias_90.notna().any() else None
+            bias_60.max(), 2) if bias_60.notna().any() else None
 
     return stats
 
