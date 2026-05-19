@@ -1,11 +1,11 @@
 name: Update Static CSV
+
 on:
   workflow_dispatch:
   schedule:
     # GitHub Actions cron uses UTC.
-    # 20:00-22:00 UTC = Taiwan time 04:00, 05:00, 06:00.
-    # - cron: "0 20-22 * * *"
-    - cron: "0 * * * *"
+    # 20:00 UTC = Taiwan time 04:00.
+    - cron: "0 20 * * *"
 
 permissions:
   contents: write
@@ -48,28 +48,18 @@ jobs:
           STATIC_OUTPUT_FILE = "AllStatic.csv"
           PY
 
-      - name: Repair AllStatic status columns without API
-        run: |
-          python generate_static_csv.py --repair-only
-
-      - name: Generate AllStatic.csv incrementally
+      - name: Generate AllStatic.csv
         env:
           FINMIND_TOKEN: ${{ secrets.FINMIND_TOKEN }}
-          STATIC_CSV_FILE: AllStatic.csv
         run: |
-          python generate_static_csv.py \
-              --max-rows 80 \
-              --min-remain 50 \
-              --check-every 20 \
-              --retry-errors \
-              --refresh-hours 24
+          python generate_static_csv.py
 
       - name: Commit AllStatic.csv
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add AllStatic.csv config.py
-          git diff --cached --quiet || git commit -m "Update AllStatic.csv incrementally"
+          git diff --cached --quiet || git commit -m "Update AllStatic.csv"
 
       - name: Push changes
         run: |
