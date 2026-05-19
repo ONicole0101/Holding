@@ -22,7 +22,7 @@ from financial_analysis import (
 )
 
 DATA_COLS = [
-    "eps_Y", "eps_ttm", "per_Y", "per_ttm",
+    "eps_Y", "eps_ttm",
     "rev", "rev_mom", "rev_qoq", "rev_yoy",
     "gross_margin", "gross_margin_qoq", "gross_margin_yoy_diff",
     "operating_margin", "operating_margin_qoq", "operating_margin_yoy_diff",
@@ -296,7 +296,7 @@ def get_revenue_trend(stock_id):
         return round((curr - prev) / prev * 100, 2)
 
     return {
-        "rev": round(curr / 1e8, 2),
+        "rev": round((curr / 1e9), 2),  # 改為bn顯示
         "mom": pct_by_offset(1),
         "qoq": pct_by_offset(3),
         "yoy": pct_by_offset(12),
@@ -365,8 +365,7 @@ def build_static_row(s: dict) -> dict:
         eps_last, eps_ttm, per_last, per_ttm, eps_y_is_prev, eps_ttm_is_prev = eps_res[:6]
         row["eps_Y"] = eps_last
         row["eps_ttm"] = eps_ttm
-        row["per_Y"] = per_last
-        row["per_ttm"] = per_ttm
+        # per_Y/per_ttm removed from AllStatic.csv. Daily PER is sourced from TaiwanStockPER.
         row["eps_Y_is_prev"] = "True" if eps_y_is_prev else "False"
         row["eps_ttm_is_prev"] = "True" if eps_ttm_is_prev else "False"
         if all_blank(row, GROUPS["eps"]):
@@ -421,9 +420,12 @@ def build_static_row(s: dict) -> dict:
         row["net_margin"] = cur_n
         row["net_margin_qoq"] = qoq_n
         row["net_margin_yoy_diff"] = yoy_n
-        row["gross_margin_is_prev"] = "True" if extract_metric_is_prev(profit_res, "gross") else "False"
-        row["operating_margin_is_prev"] = "True" if extract_metric_is_prev(profit_res, "op") else "False"
-        row["net_margin_is_prev"] = "True" if extract_metric_is_prev(profit_res, "net") else "False"
+        row["gross_margin_is_prev"] = "True" if extract_metric_is_prev(
+            profit_res, "gross") else "False"
+        row["operating_margin_is_prev"] = "True" if extract_metric_is_prev(
+            profit_res, "op") else "False"
+        row["net_margin_is_prev"] = "True" if extract_metric_is_prev(
+            profit_res, "net") else "False"
         if all_blank(row, GROUPS["profit"]):
             set_group_status(row, "profit", "no_data",
                              "empty")
@@ -447,8 +449,10 @@ def build_static_row(s: dict) -> dict:
         row["pbr_latest"] = per_pbr.get("pbr")
         row["pbr_60d_high"] = per_pbr.get("pbr_60d_high")
         row["pbr_60d_low"] = per_pbr.get("pbr_60d_low")
-        row["per_latest_is_prev"] = "True" if per_pbr.get("per_is_prev") else "False"
-        row["pbr_latest_is_prev"] = "True" if per_pbr.get("pbr_is_prev") else "False"
+        row["per_latest_is_prev"] = "True" if per_pbr.get(
+            "per_is_prev") else "False"
+        row["pbr_latest_is_prev"] = "True" if per_pbr.get(
+            "pbr_is_prev") else "False"
         if all_blank(row, GROUPS["valuation"]):
             set_group_status(row, "valuation", "no_data",
                              "empty")
@@ -475,7 +479,8 @@ def normalize_static_df(df: pd.DataFrame) -> pd.DataFrame:
         if c not in df.columns:
             df[c] = None
     for c in PREV_FLAG_COLS:
-        df[c] = df[c].apply(lambda v: "True" if str(v).strip().lower() == "true" else "False")
+        df[c] = df[c].apply(lambda v: "True" if str(
+            v).strip().lower() == "true" else "False")
     df["stock_id"] = df["stock_id"].astype(str).str.strip()
     return df[ORDERED_COLS]
 
@@ -556,113 +561,66 @@ def repair_legacy_status_only(df: pd.DataFrame) -> pd.DataFrame:
     return normalize_static_df(pd.DataFrame(repaired))
 
 
-def build_incremental(stock_list, output_file, max_rows, min_remain, retry_errors, retry_no_data, force, sleep_sec, repair_only, check_every, refresh_hours):
+def build_incremental(stock_list, output_file, max_rows=None, min_remain=None, retry_errors=False, retry_no_data=False, force=False, sleep_sec=0.2, repair_only=False, check_every=10, refresh_hours=0):
+    """
+    Full rebuild AllStatic.csv on every run.
+
+    Project rule:
+    - Do not use incremental catch-up/cache logic.
+    - Do not stop by FinMind token quota/remain.
+    - Do not keep old rows from the existing AllStatic.csv.
+    - per_Y/per_ttm are removed from output columns.
+    """
     token_status = get_finmind_token_status()
     log_finmind_static_event(
         "generate_static_start",
         source="generate_static_csv",
         status=token_status.get("login_status"),
-        message=f"output={output_file}, token={token_status.get('token_masked')}",
+        message=f"full_rebuild=1, output={output_file}, token={token_status.get('token_masked')}",
     )
 
-    existing = read_existing_static(output_file)
-    existing = repair_legacy_status_only(existing)
-    existing_by_id = {
-        str(r["stock_id"]): r.to_dict()
-        for _, r in existing.iterrows()
-        if str(r.get("stock_id", "")).strip()
-    }
-
-    src_ids = [str(s["stock_id"]).strip() for s in stock_list]
-    rows_by_id = {sid: existing_by_id.get(
-        sid, empty_static_row(s)) for sid, s in zip(src_ids, stock_list)}
-
-    ordered_rows = [rows_by_id[str(s["stock_id"]).strip()] for s in stock_list]
-    atomic_write_csv(pd.DataFrame(ordered_rows), output_file)
-
     if repair_only:
-        print(f"Repaired statuses only -> {output_file}", flush=True)
-        return
+        print("repair_only is ignored: full rebuild mode always refreshes all rows.", flush=True)
 
-    candidates = []
-    for s in stock_list:
-        sid = str(s["stock_id"]).strip()
-        current = rows_by_id.get(sid)
-        if should_update(current, retry_errors=retry_errors, retry_no_data=retry_no_data, force=force, refresh_hours=refresh_hours,):
-            candidates.append(s)
-
-    print(f"Existing rows: {len(existing_by_id)}", flush=True)
+    print("Full rebuild mode: existing AllStatic.csv will not be reused.", flush=True)
     print(f"Total source stocks: {len(stock_list)}", flush=True)
-    stale_ok_count = sum(is_stale_ok_row(rows_by_id.get(
-        str(s["stock_id"]).strip(), {}), refresh_hours) for s in stock_list)
-    print(f"Need update this run: {len(candidates)}", flush=True)
-    print(f"Stale OK rows queued for refresh: {stale_ok_count}", flush=True)
 
+    # Token usage is logged for evidence only. It is no longer used as a stop condition.
+    try:
+        get_finmind_usage()
+    except Exception as e:
+        print(f"Cannot check FinMind usage, continue full rebuild: {e}", flush=True)
+
+    rows = []
     processed = 0
-    stop_reason = "completed"
 
-    for i, s in enumerate(candidates, 1):
-        if max_rows is not None and processed >= max_rows:
-            stop_reason = f"max_rows reached: {max_rows}"
-            break
-
-        # Checking user_info too often can itself consume quota on some plans.
-        # Check before the first stock and then every N processed stocks.
-        should_check_usage = processed == 0 or (
-            check_every and processed % check_every == 0)
-        if should_check_usage:
-            try:
-                _, limit, remain = get_finmind_usage()
-                current_usage = _LAST_FINMIND_USAGE_INFO
-                for _sid in rows_by_id:
-                    apply_finmind_usage_to_row(rows_by_id[_sid], current_usage)
-                if limit <= 0:
-                    print(
-                        "FinMind usage unknown/unreliable; continue until explicit upper limit error", flush=True)
-                elif remain <= min_remain:
-                    stop_reason = f"FinMind remain <= min_remain: {remain} <= {min_remain}"
-                    break
-            except Exception as e:
-                print(
-                    f"Cannot check FinMind usage, continue cautiously: {e}", flush=True)
-
-        sid = str(s["stock_id"]).strip()
-        print(
-            f"Processing {i}/{len(candidates)}: {sid} {s.get('name')}", flush=True)
+    for i, s in enumerate(stock_list, 1):
+        sid = str(s.get("stock_id", "")).strip()
+        print(f"Processing {i}/{len(stock_list)}: {sid} {s.get('name')}", flush=True)
 
         row = build_static_row(s)
         apply_finmind_usage_to_row(row)
-        rows_by_id[sid] = row
+        rows.append(row)
         processed += 1
 
-        ordered_rows = [rows_by_id[str(x["stock_id"]).strip()]
-                        for x in stock_list]
-        atomic_write_csv(pd.DataFrame(ordered_rows), output_file)
-        print(
-            f"Saved progress: {processed} updated in this run -> {output_file}", flush=True)
-
-        if str(row.get("static_status", "")).lower() == "api_limited":
-            stop_reason = f"FinMind API upper limit reached at {sid} {s.get('name')}: {row.get('static_reason')}"
-            break
-
-        if sleep_sec > 0:
+        if sleep_sec and sleep_sec > 0:
             time.sleep(sleep_sec)
 
-    final_df = read_existing_static(output_file)
-    status_counts = final_df["static_status"].astype(
-        str).str.lower().value_counts().to_dict() if not final_df.empty else {}
+    final_df = normalize_static_df(pd.DataFrame(rows))
+    atomic_write_csv(final_df, output_file)
+
+    status_counts = final_df["static_status"].astype(str).str.lower().value_counts().to_dict() if not final_df.empty else {}
+
     log_finmind_static_event(
         "generate_static_end",
         source="generate_static_csv",
-        status=stop_reason,
-        message=f"updated={processed}, output={output_file}",
+        status="completed",
+        message=f"full_rebuild=1, updated={processed}, output={output_file}",
     )
 
-    print(f"Run stopped: {stop_reason}", flush=True)
+    print("Run stopped: completed", flush=True)
     print(f"Updated this run: {processed}", flush=True)
-    print(
-        f"AllStatic progress: {status_counts}, total={len(final_df)}", flush=True)
-
+    print(f"AllStatic full rebuild: {status_counts}, total={len(final_df)}", flush=True)
 
 def load_stock_list():
     csv_file = config.CSV_FILE
@@ -675,27 +633,27 @@ def load_stock_list():
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Incrementally build AllStatic.csv and distinguish no_data from incomplete/API limit.")
+        description="Full rebuild AllStatic.csv every run.")
     parser.add_argument("--output", default=getattr(config,
                         "STATIC_OUTPUT_FILE", "AllStatic.csv"))
     parser.add_argument("--max-rows", type=int, default=None,
-                        help="Max stocks to update in this run.")
-    parser.add_argument("--min-remain", type=int, default=20,
-                        help="Stop before FinMind remain drops to this number.")
+                        help="Ignored in full rebuild mode; kept for workflow compatibility.")
+    parser.add_argument("--min-remain", type=int, default=0,
+                        help="Ignored in full rebuild mode; API quota no longer stops the run.")
     parser.add_argument("--retry-errors", action="store_true",
-                        help="Retry rows whose static_status is error.")
+                        help="Ignored in full rebuild mode; all rows are refreshed.")
     parser.add_argument("--retry-no-data", action="store_true",
-                        help="Retry rows marked partial_ok/no_data.")
+                        help="Ignored in full rebuild mode; all rows are refreshed.")
     parser.add_argument("--force", action="store_true",
-                        help="Refresh every stock even if existing row is terminal.")
+                        help="Ignored in full rebuild mode; all rows are refreshed.")
     parser.add_argument("--repair-only", action="store_true",
-                        help="Only repair status columns; do not call APIs.")
+                        help="Ignored in full rebuild mode; APIs are called for all rows.")
     parser.add_argument("--sleep-sec", type=float,
                         default=0.2, help="Sleep between stocks.")
     parser.add_argument("--check-every", type=int, default=10,
                         help="Check FinMind usage before first stock and every N processed stocks. Use 1 for every stock.")
-    parser.add_argument("--refresh-hours", type=int, default=24,
-                        help="Refresh rows whose static_status is ok and static_updated_at is older than N hours. Use 0 to disable.")
+    parser.add_argument("--refresh-hours", type=int, default=0,
+                        help="Ignored in full rebuild mode; all rows are refreshed.")
     args = parser.parse_args()
 
     try:

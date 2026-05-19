@@ -56,15 +56,38 @@ def build_output(result):
     }
 
 
+def _normalize_metric_name(value) -> str:
+    """Normalize FinMind financial-statement metric labels for exact matching."""
+    if value is None:
+        return ""
+    text = str(value).strip().lower()
+    replacements = {
+        "（": "(",
+        "）": ")",
+        "％": "%",
+        " ": "",
+        "\u3000": "",
+        "－": "-",
+        "—": "-",
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+    return text
+
 
 def _metric_name_mask(df: pd.DataFrame, names: list[str]):
-    """Match FinMind metric by type/name/origin_name, tolerant of Chinese labels."""
+    """Exact-match FinMind metric by type/name/origin_name after normalization.
+
+    Do not use contains(). Labels such as 營業收入, 毛利, 毛利率, 淨利 and
+    淨利率 overlap; substring matching can select the wrong row and explode
+    EPS/margins/QoQ/YoY.
+    """
     mask = pd.Series(False, index=df.index)
+    clean_names = {_normalize_metric_name(name) for name in names}
     for col in ("type", "name", "origin_name"):
         if col in df.columns:
-            s = df[col].astype(str)
-            for name in names:
-                mask = mask | s.str.fullmatch(name, case=False, na=False) | s.str.contains(name, case=False, na=False, regex=False)
+            s = df[col].map(_normalize_metric_name)
+            mask = mask | s.isin(clean_names)
     return mask
 
 
@@ -77,89 +100,199 @@ def _standardize_financial_df(data) -> pd.DataFrame:
     return df.dropna(subset=["date", "value"]).sort_values("date")
 
 
+def _series_by_metric(df: pd.DataFrame, aliases: list[str]) -> pd.Series:
+    """Return one value per statement date for a strictly matched metric."""
+    if df is None or df.empty:
+        return pd.Series(dtype="float64")
+    m = df.loc[_metric_name_mask(df, aliases), ["date", "value"]].copy()
+    if m.empty:
+        return pd.Series(dtype="float64")
+    m["value"] = pd.to_numeric(m["value"], errors="coerce")
+    m = m.dropna(subset=["date", "value"]).sort_values("date")
+    if m.empty:
+        return pd.Series(dtype="float64")
+    return (
+        m.drop_duplicates("date", keep="last")
+         .set_index("date")["value"]
+         .sort_index()
+         .astype(float)
+    )
+
+
+def _normalize_percent_series(s: pd.Series, max_abs: float = 200.0) -> pd.Series:
+    """Normalize percentage values and remove impossible polluted rows."""
+    if s is None or s.empty:
+        return pd.Series(dtype="float64")
+    s = pd.to_numeric(s, errors="coerce").dropna().astype(float)
+    if s.empty:
+        return s
+
+    # Some APIs store ratios as decimals, for example 0.2332 means 23.32%.
+    median_abs = s.abs().median()
+    if pd.notna(median_abs) and median_abs <= 1.5:
+        s = s * 100
+
+    s = s.round(2)
+    return s[s.between(-max_abs, max_abs)]
+
+
+def _calc_current_qoq_yoy(s: pd.Series, latest_statement_date=None) -> dict:
+    """Calculate current value, QoQ and YoY as percentage-point differences."""
+    s = _normalize_percent_series(s)
+    if s.empty:
+        return {"current": None, "prev": None, "yoy": None, "qoq": None, "yoy_diff": None, "is_prev": False}
+
+    current_date = s.index.max()
+    current = float(s.loc[current_date])
+
+    prev = float(s.iloc[-2]) if len(s) >= 2 else None
+
+    # Prefer same year/quarter matching instead of exact date - 1 year.
+    current_year = int(current_date.year)
+    current_quarter = int(current_date.quarter)
+    yoy_candidates = [
+        idx for idx in s.index
+        if int(idx.year) == current_year - 1 and int(idx.quarter) == current_quarter
+    ]
+    if yoy_candidates:
+        yoy_date = max(yoy_candidates)
+        yoy = float(s.loc[yoy_date])
+    elif len(s) >= 5:
+        yoy = float(s.iloc[-5])
+    else:
+        yoy = None
+
+    if latest_statement_date is None:
+        latest_statement_date = current_date
+
+    return {
+        "current": round(current, 2),
+        "prev": round(prev, 2) if prev is not None else None,
+        "yoy": round(yoy, 2) if yoy is not None else None,
+        "qoq": calc_diff(current, prev),
+        "yoy_diff": calc_diff(current, yoy),
+        "is_prev": bool(current_date < latest_statement_date),
+    }
+
+
 def get_profit_ratio(stock_id):
     """
-    Return latest available gross/operating/net margins.
+    Return latest gross/operating/net margins.
 
-    Important: do NOT drop the whole quarter just because one metric is missing.
-    Each margin finds its own latest valid Revenue + numerator pair. This prevents
-    FinMind having data for one ratio while another incomplete field makes all
-    margins blank.
+    Project rule:
+    1. The displayed margins are percentage points, for example 23.32.
+    2. QoQ/YoY are percentage-point differences, for example +3.75.
+    3. Prefer amount-account calculation from FinMind financial statements:
+       Revenue / GrossProfit / OperatingIncome / IncomeAfterTaxes.
+    4. Use precomputed ratio rows only as fallback.
+    5. Never substring-match metric names.
     """
     try:
         df = _standardize_financial_df(get_profit_ratio_raw(stock_id))
         if df.empty:
             return None
 
-        metric_aliases = {
-            "Revenue": ["Revenue", "營業收入", "營業收入合計", "收益", "收入"],
-            "GrossProfit": ["GrossProfit", "營業毛利", "營業毛利（毛損）", "毛利"],
-            "OperatingIncome": ["OperatingIncome", "營業利益", "營業利益（損失）", "營益", "營業淨利"],
-            "IncomeAfterTaxes": ["IncomeAfterTaxes", "本期淨利", "稅後淨利", "本期淨利（淨損）", "淨利"],
+        latest_statement_date = df["date"].max()
+
+        amount_aliases = {
+            "Revenue": [
+                "Revenue",
+                "營業收入",
+                "營業收入合計",
+                "營業收入淨額",
+                "營業收益",
+                "收益",
+                "收入",
+            ],
+            "GrossProfit": [
+                "GrossProfit",
+                "營業毛利",
+                "營業毛利(毛損)",
+                "營業毛利（毛損）",
+            ],
+            "OperatingIncome": [
+                "OperatingIncome",
+                "營業利益",
+                "營業利益(損失)",
+                "營業利益（損失）",
+            ],
+            "IncomeAfterTaxes": [
+                "IncomeAfterTaxes",
+                "本期淨利",
+                "本期淨利(淨損)",
+                "本期淨利（淨損）",
+                "稅後淨利",
+                "繼續營業單位稅後淨利(淨損)",
+                "繼續營業單位稅後淨利（淨損）",
+            ],
         }
 
-        parts = []
-        for std_name, aliases in metric_aliases.items():
-            m = df.loc[_metric_name_mask(df, aliases), ["date", "value"]].copy()
-            if m.empty:
-                continue
-            m["metric"] = std_name
-            parts.append(m)
+        amount_series = {k: _series_by_metric(
+            df, v) for k, v in amount_aliases.items()}
+        revenue = amount_series["Revenue"]
 
-        if not parts:
-            return None
+        def calc_margin_from_amount(numerator_key: str) -> pd.Series:
+            numerator = amount_series.get(
+                numerator_key, pd.Series(dtype="float64"))
+            if revenue.empty or numerator.empty:
+                return pd.Series(dtype="float64")
 
-        long_df = pd.concat(parts, ignore_index=True)
-        pivot = long_df.pivot_table(index="date", columns="metric", values="value", aggfunc="last").sort_index()
-        if "Revenue" not in pivot.columns:
-            return None
+            merged = pd.concat(
+                [revenue.rename("revenue"), numerator.rename("numerator")],
+                axis=1,
+                join="inner",
+            ).dropna()
+            if merged.empty:
+                return pd.Series(dtype="float64")
 
-        latest_statement_date = pivot.index.max()
+            merged = merged[merged["revenue"] > 0]
+            if merged.empty:
+                return pd.Series(dtype="float64")
 
-        def margin_series(numerator: str):
-            if numerator not in pivot.columns:
-                return pd.DataFrame(columns=["margin"])
-            tmp = pivot[["Revenue", numerator]].copy()
-            tmp["Revenue"] = pd.to_numeric(tmp["Revenue"], errors="coerce")
-            tmp[numerator] = pd.to_numeric(tmp[numerator], errors="coerce")
-            tmp = tmp.dropna(subset=["Revenue", numerator])
-            tmp = tmp[tmp["Revenue"] > 0]
-            if tmp.empty:
-                return pd.DataFrame(columns=["margin"])
-            tmp["margin"] = (tmp[numerator] / tmp["Revenue"] * 100).round(2)
-            return tmp[["margin"]]
+            s = (merged["numerator"] / merged["revenue"] * 100).round(2)
+            return s[s.between(-200.0, 200.0)]
 
-        def calc_one(numerator: str):
-            ms = margin_series(numerator)
-            if ms.empty:
-                return {"current": None, "prev": None, "yoy": None, "qoq": None, "yoy_diff": None, "is_prev": False}
+        # Amount-based calculation is the primary path. Units cancel out.
+        gross_s = calc_margin_from_amount("GrossProfit")
+        op_s = calc_margin_from_amount("OperatingIncome")
+        net_s = calc_margin_from_amount("IncomeAfterTaxes")
 
-            current_date = ms.index.max()
-            current = float(ms.loc[current_date, "margin"])
+        # Ratio rows are fallback only, and only for the specific metric that is missing.
+        ratio_aliases = {
+            "gross": [
+                "GrossMargin",
+                "gross_margin",
+                "毛利率",
+                "營業毛利率",
+            ],
+            "op": [
+                "OperatingMargin",
+                "operating_margin",
+                "營業利益率",
+                "營益率",
+                "營業利益率(%)",
+                "營益率(%)",
+            ],
+            "net": [
+                "NetMargin",
+                "net_margin",
+                "稅後淨利率",
+                "淨利率",
+                "稅後淨利率(%)",
+                "淨利率(%)",
+            ],
+        }
 
-            prev = None
-            if len(ms) >= 2:
-                prev = float(ms.iloc[-2]["margin"])
+        if gross_s.empty:
+            gross_s = _series_by_metric(df, ratio_aliases["gross"])
+        if op_s.empty:
+            op_s = _series_by_metric(df, ratio_aliases["op"])
+        if net_s.empty:
+            net_s = _series_by_metric(df, ratio_aliases["net"])
 
-            same_q_last_year = current_date - pd.DateOffset(years=1)
-            yoy = None
-            if same_q_last_year in ms.index:
-                yoy = float(ms.loc[same_q_last_year, "margin"])
-            elif len(ms) >= 5:
-                yoy = float(ms.iloc[-5]["margin"])
-
-            return {
-                "current": round(current, 2),
-                "prev": round(prev, 2) if prev is not None else None,
-                "yoy": round(yoy, 2) if yoy is not None else None,
-                "qoq": calc_diff(current, prev),
-                "yoy_diff": calc_diff(current, yoy),
-                "is_prev": bool(current_date < latest_statement_date),
-            }
-
-        gross = calc_one("GrossProfit")
-        op = calc_one("OperatingIncome")
-        net = calc_one("IncomeAfterTaxes")
+        gross = _calc_current_qoq_yoy(gross_s, latest_statement_date)
+        op = _calc_current_qoq_yoy(op_s, latest_statement_date)
+        net = _calc_current_qoq_yoy(net_s, latest_statement_date)
 
         return {
             "current": {"gross": gross["current"], "op": op["current"], "net": net["current"]},
@@ -194,54 +327,68 @@ def get_eps_analysis(stock_id, current_price=None):
     """
     EPS from FinMind TaiwanStockFinancialStatements.
 
-    Uses latest valid data instead of hard-coding current calendar year/quarter.
-    Returns: eps_Y, eps_ttm, per_Y, per_ttm, eps_Y_is_prev, eps_ttm_is_prev
+    Project rule:
+    - eps_Y column is kept for compatibility, but its displayed value is the
+      latest quarter EPS.
+    - eps_ttm is the latest four quarters total.
+    - PER is calculated only when current_price is provided.
     """
     try:
         df = _standardize_financial_df(get_eps_raw(stock_id))
         if df.empty:
             return (None, None, None, None, False, False)
 
-        eps_mask = _metric_name_mask(df, ["EPS", "基本每股盈餘", "每股盈餘"])
+        eps_aliases = [
+            "EPS",
+            "BasicEPS",
+            "basic_eps",
+            "基本每股盈餘",
+            "基本每股盈餘(元)",
+            "基本每股盈餘（元）",
+            "每股盈餘",
+        ]
+        eps_mask = _metric_name_mask(df, eps_aliases)
         eps_df = df.loc[eps_mask, ["date", "value"]].copy()
+
+        # Avoid diluted EPS if both basic and diluted are present.
+        for col in ("type", "name", "origin_name"):
+            if col in df.columns and not eps_df.empty:
+                labels = df.loc[eps_df.index, col].map(_normalize_metric_name)
+                diluted_mask = labels.str.contains(
+                    "稀釋", na=False) | labels.str.contains("diluted", na=False)
+                if diluted_mask.any() and (~diluted_mask).any():
+                    eps_df = eps_df.loc[~diluted_mask]
+
+        if eps_df.empty:
+            return (None, None, None, None, False, False)
+
+        eps_df["value"] = pd.to_numeric(eps_df["value"], errors="coerce")
+        eps_df = eps_df.dropna(subset=["date", "value"]).sort_values("date")
         if eps_df.empty:
             return (None, None, None, None, False, False)
 
         eps_df["year"] = eps_df["date"].dt.year.astype(int)
         eps_df["season"] = eps_df["date"].dt.quarter.astype(int)
         eps_df = (
-            eps_df.sort_values("date")
-                  .drop_duplicates(["year", "season"], keep="last")
-                  .dropna(subset=["value"])
+            eps_df.drop_duplicates(["year", "season"], keep="last")
+                  .sort_values("date")
                   .reset_index(drop=True)
         )
         if eps_df.empty:
             return (None, None, None, None, False, False)
 
         latest_eps_date = eps_df["date"].max()
+        latest_eps_row = eps_df.iloc[-1]
 
-        annual = (
-            eps_df.groupby("year")
-                  .agg(eps_sum=("value", "sum"), q_count=("season", "nunique"), last_date=("date", "max"))
-                  .reset_index()
-                  .sort_values("year")
-        )
-        annual_full = annual[annual["q_count"] >= 4]
-        if not annual_full.empty:
-            yrow = annual_full.iloc[-1]
-        else:
-            # Fallback for newly listed or incomplete years: use latest available year sum.
-            yrow = annual.iloc[-1]
-        eps_y = round(float(yrow["eps_sum"]), 2) if pd.notna(yrow["eps_sum"]) else None
-        eps_y_is_prev = bool(pd.to_datetime(yrow["last_date"]) < latest_eps_date)
+        eps_latest_quarter = round(float(latest_eps_row["value"]), 2)
 
-        latest4 = eps_df.sort_values("date").tail(4)
+        latest4 = eps_df.tail(4)
         if len(latest4) >= 4:
             eps_ttm = round(float(latest4["value"].sum()), 2)
             eps_ttm_is_prev = bool(latest4["date"].max() < latest_eps_date)
         else:
-            eps_ttm = eps_y
-            eps_ttm_is_prev = eps_y_is_prev
+            eps_ttm = eps_latest_quarter
+            eps_ttm_is_prev = False
 
         def calc_per(price, eps):
             try:
@@ -251,14 +398,15 @@ def get_eps_analysis(stock_id, current_price=None):
                 return None
             return round(price / eps, 2) if price > 0 and eps > 0 else None
 
-        per_y = calc_per(current_price, eps_y)
+        per_y = calc_per(current_price, eps_latest_quarter)
         per_ttm = calc_per(current_price, eps_ttm)
 
-        return eps_y, eps_ttm, per_y, per_ttm, eps_y_is_prev, eps_ttm_is_prev
+        return eps_latest_quarter, eps_ttm, per_y, per_ttm, False, eps_ttm_is_prev
 
     except Exception as e:
         print(f"❌ EPS error {stock_id}: {e}")
         return (None, None, None, None, False, False)
+
 
 def get_dividend_yield(stock_id, current_price=None):
     try:
