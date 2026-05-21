@@ -9,6 +9,40 @@ import config
 from main import get_full_stock_analysis
 
 
+TECH_COLUMNS = [
+    {"key": "position_zone", "label": "位階"},
+    {"key": "price_volume_state", "label": "價量"},
+    {"key": "trend_stage", "label": "趨勢階段"},
+    {"key": "ma6", "label": "MA6"},
+    {"key": "ma18", "label": "MA18"},
+    {"key": "ma50", "label": "MA50"},
+    {"key": "macd_hist", "label": "MACD柱"},
+]
+
+
+def enrich_html_fields(results):
+    """補上 HTML 可直接顯示的技術摘要欄位。
+
+    template.html 若要顯示新增欄位，可直接讀：
+    tech_summary / position_zone / price_volume_state / trend_stage / ma6 / ma18 / ma50 / macd_hist。
+    """
+    out = []
+    for item in results:
+        if not item:
+            continue
+        x = dict(item)
+        parts = []
+        for key in ("position_zone", "price_volume_state", "trend_stage"):
+            val = x.get(key)
+            if val not in (None, ""):
+                parts.append(str(val))
+        if x.get("macd_hist") is not None:
+            parts.append(f"MACD柱 {x.get('macd_hist')}")
+        x["tech_summary"] = " / ".join(parts) if parts else x.get("signal_text", "")
+        out.append(x)
+    return out
+
+
 def get_finmind_usage():
     token = os.getenv("FINMIND_TOKEN")
     headers = {"Authorization": f"Bearer {token}"}
@@ -29,7 +63,7 @@ def get_static_csv_path():
 
 
 def format_output(results):
-    results = [r for r in results if r]
+    results = enrich_html_fields([r for r in results if r])
 
     def safe_num(v, default=-999999):
         return v if isinstance(v, (int, float)) and v is not None else default
@@ -158,6 +192,7 @@ def main():
                 report_subtitle=report_subtitle,
                 report_type=report_type,
                 generated_time=now_dt.strftime("%Y-%m-%d %H:%M"),
+                tech_columns=TECH_COLUMNS,
             )
 
             for f_name in [filename, "index.html"]:

@@ -216,8 +216,14 @@ def process_stock(s, static_map=None):
         k_trend = kd_trend.get("kd_trend")
         d_trend = None
 
-        ma18 = latest["MA18"] if pd.notna(latest["MA18"]) else None
-        prev_ma18 = prev["MA18"] if pd.notna(prev["MA18"]) else None
+        ma6 = latest["MA6"] if "MA6" in latest and pd.notna(latest["MA6"]) else None
+        prev_ma6 = prev["MA6"] if "MA6" in prev and pd.notna(prev["MA6"]) else None
+        ma18 = latest["MA18"] if "MA18" in latest and pd.notna(latest["MA18"]) else None
+        prev_ma18 = prev["MA18"] if "MA18" in prev and pd.notna(prev["MA18"]) else None
+        ma50 = latest["MA50"] if "MA50" in latest and pd.notna(latest["MA50"]) else None
+        prev_ma50 = prev["MA50"] if "MA50" in prev and pd.notna(prev["MA50"]) else None
+        macd_hist = latest["MACD_HIST"] if "MACD_HIST" in latest and pd.notna(latest["MACD_HIST"]) else None
+        prev_macd_hist = prev["MACD_HIST"] if "MACD_HIST" in prev and pd.notna(prev["MACD_HIST"]) else None
         close = latest["close"]
         prev_close = prev["close"]
 
@@ -282,6 +288,12 @@ def process_stock(s, static_map=None):
                 ma18=ma18,
                 prev_ma18=prev_ma18,
                 prev_close=prev_close,
+                ma6=ma6,
+                prev_ma6=prev_ma6,
+                ma50=ma50,
+                prev_ma50=prev_ma50,
+                macd_hist=macd_hist,
+                prev_macd_hist=prev_macd_hist,
             ) or {"signal": "等待觀察", "reason": "", "signal_text": "等待觀察"}
         except Exception as e:
             print(f"❌ signal error {stock_id}: {e}")
@@ -291,6 +303,9 @@ def process_stock(s, static_map=None):
         signal = signal_res.get("signal", "等待觀察")
         reason = signal_res.get("reason", "")
         signal_text = signal_res.get("signal_text", "等待觀察")
+        position_zone = signal_res.get("position_zone")
+        price_volume_state = signal_res.get("price_volume_state")
+        trend_stage = signal_res.get("trend_stage")
 
         sig = 1 if signal == "買進" else -1 if signal == "賣出" else 0
 
@@ -377,14 +392,19 @@ def process_stock(s, static_map=None):
             "volume_ratio": float(volume_ratio) if volume_ratio is not None else None,
             "volume_add": volume_add if volume_add is not None else None,
 
-            "ma6": safe_ma_stats.get("ma6"),
+            "ma6": float(round(ma6, 2)) if ma6 is not None else safe_ma_stats.get("ma6"),
+            "prev_ma6": float(round(prev_ma6, 2)) if prev_ma6 is not None else None,
             "bias6": bias6,
             "bias6_min": bias6_min,
             "bias6_max": bias6_max,
             "bias18": bias18,
             "bias18_min": bias18_min,
             "bias18_max": bias18_max,
-            "ma50": safe_ma_stats.get("ma50"),
+            "ma50": float(round(ma50, 2)) if ma50 is not None else safe_ma_stats.get("ma50"),
+            "prev_ma50": float(round(prev_ma50, 2)) if prev_ma50 is not None else None,
+            "macd_hist": float(round(macd_hist, 4)) if macd_hist is not None else None,
+            "prev_macd_hist": float(round(prev_macd_hist, 4)) if prev_macd_hist is not None else None,
+            "macd_hist_delta": float(round(macd_hist - prev_macd_hist, 4)) if macd_hist is not None and prev_macd_hist is not None else None,
             "bias50": bias50,
             "bias50_min": bias50_min,
             "bias50_max": bias50_max,
@@ -394,6 +414,9 @@ def process_stock(s, static_map=None):
             "score": float(score),
             "signal_text": signal_text,
             "reason": reason,
+            "position_zone": position_zone,
+            "price_volume_state": price_volume_state,
+            "trend_stage": trend_stage,
             "entry_note": entry_note,
         }
         return {k: to_py(v) for k, v in result.items()}

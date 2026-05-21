@@ -100,6 +100,10 @@ def _calc_position_zone(
     kd_turn_weak,
     k_trend_up,
     k_trend_down,
+    ma18_up=False,
+    ma50_up=False,
+    above_ma50=False,
+    below_ma50=False,
 ):
     """
     股價位階粗分：
@@ -107,6 +111,10 @@ def _calc_position_zone(
     - 上漲途中：站上月線且動能偏強，或剛突破月線
     - 頂部區域：布林高檔 / 乖離高檔 / KD高檔
     - 下跌途中：跌破月線或在月線下且動能偏弱
+
+    聯發科 2454 檢討修正：
+    - 剛站回月線、KD轉強、價量轉強時，優先視為起漲/上漲途中。
+    - KD高檔不等於頂部；必須搭配乖離/布林過熱或趨勢跌破才視為頂部。
     """
     bb_pct = _num(bb_pct)
 
@@ -116,10 +124,16 @@ def _calc_position_zone(
     bb_high = bb_pct is not None and bb_pct > 80
     bb_overheat = bb_pct is not None and bb_pct > 95
 
-    # 下跌途中優先於底部，避免「跌破後還沒止穩」被誤判為低接
+    early_uptrend = ma18_break and (kd_turn_strong or k_trend_up)
+    trend_supported = above_ma18 and (ma18_up or ma50_up or above_ma50)
+
+    # 下跌途中優先於底部，避免「跌破後還沒止穩」被誤判為低接。
     if ma18_fall_break or (below_ma18 and (kd_turn_weak or k_trend_down)):
         zone = '下跌途中'
-    elif above_ma18 and (k_trend_up or kd_turn_strong or ma18_break) and not bb_overheat:
+    # 起漲與上漲途中優先於 KD 高檔，避免聯發科 4 月剛啟動時被太早賣出。
+    elif early_uptrend or (above_ma18 and (k_trend_up or kd_turn_strong) and not bb_overheat):
+        zone = '上漲途中'
+    elif trend_supported and not (bb_overheat and bias_high_zone):
         zone = '上漲途中'
     elif bb_overheat or (bias_high_zone and kd_high):
         zone = '頂部區域'
@@ -127,7 +141,7 @@ def _calc_position_zone(
         zone = '底部區域'
     elif above_ma18:
         zone = '上漲途中'
-    elif below_ma18:
+    elif below_ma18 or below_ma50:
         zone = '下跌途中'
     else:
         zone = '盤整區域'
@@ -169,15 +183,23 @@ def get_tech_signal(
     prev_close=None,
     k_trend=None,
     d_trend=None,
+    # 以下為向下相容的選填欄位；呼叫端沒有給也不影響原本功能。
+    ma6=None,
+    prev_ma6=None,
+    ma50=None,
+    prev_ma50=None,
+    macd_hist=None,
+    prev_macd_hist=None,
 ):
     """
     技術訊號主邏輯。
 
-    2026 改版重點：
+    2026 聯發科/廣達檢討改版重點：
     1. 先判斷「位階」：底部區域 / 上漲途中 / 頂部區域 / 下跌途中 / 盤整區域
     2. 再判斷「價量關係」：價漲量增 / 價漲量縮 / 價跌量增 / 價跌量縮 / 價平量增 / 價平量縮
-    3. 最後才用 KD、月線、布林與乖離確認買賣訊號
-    4. 避免像廣達 2382 這種「剛進入上漲途中」卻因 KD 高檔而過早賣出
+    3. 最後才用 KD、月線、布林、乖離、MACD 輔助確認買賣訊號
+    4. 避免「剛進入上漲途中」卻因 KD 高檔或短線拉回而過早賣出
+    5. 下跌途中低接只給觀察，不在未止跌前直接買進或重壓
     """
     reasons = []
 
@@ -188,9 +210,15 @@ def get_tech_signal(
     d = _num(d)
     prev_k = _num(prev_k)
     prev_d = _num(prev_d)
+    ma6 = _num(ma6)
+    prev_ma6 = _num(prev_ma6)
     ma18 = _num(ma18)
     prev_ma18 = _num(prev_ma18)
+    ma50 = _num(ma50)
+    prev_ma50 = _num(prev_ma50)
     prev_close = _num(prev_close)
+    macd_hist = _num(macd_hist)
+    prev_macd_hist = _num(prev_macd_hist)
 
     if close is None:
         return {
@@ -237,8 +265,16 @@ def get_tech_signal(
     price_down_raw = chgPct is not None and chgPct < 0
     price_flat_raw = chgPct is not None and abs(chgPct) < 0.5
 
+    above_ma6 = ma6 is not None and close > ma6
+    below_ma6 = ma6 is not None and close < ma6
     above_ma18 = ma18 is not None and close > ma18
     below_ma18 = ma18 is not None and close < ma18
+    above_ma50 = ma50 is not None and close > ma50
+    below_ma50 = ma50 is not None and close < ma50
+
+    ma6_up = ma6 is not None and prev_ma6 is not None and ma6 > prev_ma6
+    ma18_up = ma18 is not None and prev_ma18 is not None and ma18 >= prev_ma18
+    ma50_up = ma50 is not None and prev_ma50 is not None and ma50 >= prev_ma50
 
     ma18_break = (
         ma18 is not None and prev_ma18 is not None and prev_close is not None
@@ -248,6 +284,11 @@ def get_tech_signal(
     ma18_fall_break = (
         ma18 is not None and prev_ma18 is not None and prev_close is not None
         and prev_close >= prev_ma18 and close < ma18
+    )
+
+    ma6_fall_break = (
+        ma6 is not None and prev_ma6 is not None and prev_close is not None
+        and prev_close >= prev_ma6 and close < ma6
     )
 
     if price_up_raw:
@@ -266,6 +307,29 @@ def get_tech_signal(
         reasons.append('股價突破月線')
     if ma18_fall_break:
         reasons.append('股價跌破月線')
+    if ma18_up:
+        reasons.append('月線走平向上')
+    if above_ma50:
+        reasons.append('股價位於季線之上')
+
+    # === MACD 輔助 ===
+    macd_turn_positive = False
+    macd_turn_negative = False
+    macd_improving = False
+    macd_weakening = False
+    if macd_hist is not None and prev_macd_hist is not None:
+        macd_turn_positive = prev_macd_hist <= 0 < macd_hist
+        macd_turn_negative = prev_macd_hist >= 0 > macd_hist
+        macd_improving = macd_hist > prev_macd_hist
+        macd_weakening = macd_hist < prev_macd_hist
+        if macd_turn_positive:
+            reasons.append('MACD柱狀體翻正')
+        elif macd_turn_negative:
+            reasons.append('MACD柱狀體翻黑')
+        elif macd_improving:
+            reasons.append('MACD動能改善')
+        elif macd_weakening:
+            reasons.append('MACD動能降溫')
 
     # === Bias 輔助 ===
     bias6_pos = safe_pos(bias6, bias6_min, bias6_max)
@@ -304,6 +368,8 @@ def get_tech_signal(
     volume_up = pv['volume_up']
     volume_down = pv['volume_down']
     volume_not_bad = pv['volume_not_bad']
+    volume_shrink = pv['volume_shrink']
+    volume_spike = pv['volume_spike']
 
     price_up = pv['price_up']
     price_down = pv['price_down']
@@ -318,6 +384,10 @@ def get_tech_signal(
         reasons.append('成交量縮小')
     elif volume_not_bad:
         reasons.append('成交量維持')
+    if volume_spike:
+        reasons.append('爆量換手')
+    if volume_shrink:
+        reasons.append('明顯量縮')
 
     # === 位階判斷 ===
     zone_info = _calc_position_zone(
@@ -335,6 +405,10 @@ def get_tech_signal(
         kd_turn_weak=kd_turn_weak,
         k_trend_up=k_trend_up,
         k_trend_down=k_trend_down,
+        ma18_up=ma18_up,
+        ma50_up=ma50_up,
+        above_ma50=above_ma50,
+        below_ma50=below_ma50,
     )
 
     position_zone = zone_info['zone']
@@ -358,29 +432,42 @@ def get_tech_signal(
     # === 強弱輔助條件 ===
     kd_strong = kd_gold_cross or kd_turn_strong or k_trend_up
     kd_weak = kd_dead_cross or kd_turn_weak or k_trend_down
+    trend_supported = above_ma18 and (ma18_up or ma50_up or above_ma50 or ma18_break)
+    early_uptrend = ma18_break and kd_strong and price_volume_state in ('價漲量增', '價平量增', '價量中性')
+    main_uptrend = position_zone == '上漲途中' and trend_supported and not ma18_fall_break
+    overheat_confirmed = bb_overheat or (bb_high and bias_high_zone) or (bias_high_zone and kd_high)
+    trend_break_confirmed = ma18_fall_break or (below_ma18 and kd_weak)
 
     # ============================================================
     # 規則判斷：位階 × 價量 × 技術確認
     # ============================================================
 
-    # 1) 明確賣出：高檔或下跌途中，出現價跌量增 / 跌破月線 / KD轉弱
-    if (
-        price_volume_state == '價跌量增'
-        and (position_zone in ('頂部區域', '下跌途中') or ma18_fall_break or below_ma18)
-        and (kd_weak or ma18_fall_break or bb_high or bb_overheat)
-    ):
+    # 1) 起漲保護：聯發科 2454 類型，剛站回月線 + 價量/KD轉強，不因短線高檔或剛獲利而賣。
+    if early_uptrend:
         return {
-            'signal': '賣出',
-            'reason': '高檔或下跌途中出現價跌量增，技術面轉弱',
+            'signal': '觀察再買進',
+            'reason': '剛突破月線且價量/KD轉強，屬起漲或轉強初期，持股不宜過早賣出',
             'signal_text': _join_reasons(reasons),
         }
 
-    # 2) 明確賣出：連續量增下跌且跌破月線
+    # 2) 明確賣出：高檔過熱後價跌量增，或已跌破月線，才直接賣出。
+    if (
+        price_volume_state == '價跌量增'
+        and (overheat_confirmed or position_zone == '下跌途中' or trend_break_confirmed)
+        and (kd_weak or trend_break_confirmed or macd_turn_negative)
+    ):
+        return {
+            'signal': '賣出',
+            'reason': '高檔過熱或下跌途中出現價跌量增，且動能/均線轉弱',
+            'signal_text': _join_reasons(reasons),
+        }
+
+    # 3) 明確賣出：連續量增下跌且跌破月線。
     if (
         volume_2day_up
         and price_down
         and ma18_fall_break
-        and kd_weak
+        and (kd_weak or macd_turn_negative)
     ):
         return {
             'signal': '賣出',
@@ -388,23 +475,49 @@ def get_tech_signal(
             'signal_text': _join_reasons(reasons),
         }
 
-    # 3) 高檔轉弱：頂部區 + 動能轉弱，但尚未有效跌破
+    # 4) 高檔轉弱：只要尚未跌破月線，不直接出清，以分批留意賣點為主。
     if (
         position_zone == '頂部區域'
-        and kd_weak
-        and price_volume_state in ('價漲量縮', '價平量增', '價跌量增', '價量中性')
+        and overheat_confirmed
+        and (kd_weak or macd_weakening or ma6_fall_break)
+        and not ma18_fall_break
     ):
         return {
             'signal': '觀察再賣出',
-            'reason': '股價位於高檔區，動能轉弱，宜分批留意賣點',
+            'reason': '高檔過熱且動能降溫，但尚未跌破月線，宜分批停利而非一次出清',
             'signal_text': _join_reasons(reasons),
         }
 
-    # 4) 下跌途中反彈：不急著買，除非重新站回月線
+    # 5) 主升段保護：月線上方、趨勢仍受支撐，KD高檔或短線降溫不視為賣出。
+    if (
+        main_uptrend
+        and price_volume_state in ('價漲量增', '價漲量縮', '價平量增', '價量中性')
+        and not overheat_confirmed
+    ):
+        return {
+            'signal': '觀察再買進' if price_volume_state in ('價漲量增', '價平量增') and kd_strong else '等待觀察',
+            'reason': '股價仍在上漲途中且月線趨勢未破，持股以續抱觀察為主，不因KD高檔過早賣出',
+            'signal_text': _join_reasons(reasons),
+        }
+
+    # 6) 上漲途中放量下跌：提高警戒，但未跌破月線前不直接賣出。
+    if (
+        main_uptrend
+        and price_volume_state == '價跌量增'
+        and (kd_weak or macd_weakening)
+        and not ma18_fall_break
+    ):
+        return {
+            'signal': '觀察再賣出',
+            'reason': '上漲途中出現價跌量增與動能轉弱，若跌破月線應降低持股',
+            'signal_text': _join_reasons(reasons),
+        }
+
+    # 7) 下跌途中反彈：不急著買，除非重新站回月線且價量/KD同步轉強。
     if (
         position_zone == '下跌途中'
+        and not early_uptrend
         and price_volume_state in ('價漲量縮', '價跌量縮', '價平量縮', '價量中性')
-        and not ma18_break
     ):
         return {
             'signal': '等待觀察',
@@ -412,61 +525,46 @@ def get_tech_signal(
             'signal_text': _join_reasons(reasons),
         }
 
-    # 5) 底部轉強：底部區 + 價漲量增 + KD轉強
+    # 8) 底部轉強：底部區 + 價漲量增 + KD/MACD改善；先觀察再買進，避免一次重壓。
     if (
         position_zone == '底部區域'
         and price_volume_state == '價漲量增'
-        and kd_strong
+        and (kd_strong or macd_improving)
         and not ma18_fall_break
     ):
         return {
             'signal': '觀察再買進',
-            'reason': '底部區域出現價漲量增與動能轉強，可觀察低檔轉強',
+            'reason': '底部區域出現價漲量增與動能改善，可觀察低檔轉強，但宜分批不宜重壓',
             'signal_text': _join_reasons(reasons),
         }
 
-    # 6) 底部止跌：底部區 + 價跌量縮 / 價平量縮
+    # 9) 底部止跌：底部區 + 價跌量縮 / 價平量縮，只能當止跌觀察。
     if (
         position_zone == '底部區域'
         and price_volume_state in ('價跌量縮', '價平量縮')
-        and (kd_turn_strong or k_trend_up or kd_low)
+        and (kd_turn_strong or k_trend_up or kd_low or volume_shrink)
     ):
         return {
             'signal': '等待觀察',
-            'reason': '底部區域跌勢趨緩，但尚未出現明確價漲量增',
+            'reason': '底部區域跌勢趨緩，但尚未出現明確價漲量增，先觀察止穩',
             'signal_text': _join_reasons(reasons),
         }
 
-    # 7) 明確買進：突破月線或站上月線，價漲量增，KD轉強
+    # 10) 明確買進：突破或站上月線，價漲量增，KD/MACD轉強，且未明顯過熱。
     if (
         price_volume_state == '價漲量增'
-        and kd_strong
+        and (kd_strong or macd_turn_positive or macd_improving)
         and (above_ma18 or ma18_break)
         and not bb_overheat
         and not bias_high_zone
     ):
         return {
             'signal': '買進',
-            'reason': '價漲量增，KD轉強，股價站上月線，技術面偏多',
+            'reason': '價漲量增，動能轉強，股價站上月線，技術面偏多',
             'signal_text': _join_reasons(reasons),
         }
 
-    # 8) 上漲途中續強：廣達 2382 類型，避免過早賣出
-    if (
-        position_zone == '上漲途中'
-        and above_ma18
-        and price_volume_state in ('價漲量增', '價平量增', '價量中性')
-        and kd_strong
-        and not bb_overheat
-        and not ma18_fall_break
-    ):
-        return {
-            'signal': '觀察再買進',
-            'reason': '股價位於上漲途中，價量與動能仍偏多，持股可續抱觀察',
-            'signal_text': _join_reasons(reasons),
-        }
-
-    # 9) 上漲途中但價漲量縮：不追高，但也不急賣
+    # 11) 上漲途中但價漲量縮：不追高，但也不急賣。
     if (
         position_zone == '上漲途中'
         and above_ma18
@@ -479,7 +577,7 @@ def get_tech_signal(
             'signal_text': _join_reasons(reasons),
         }
 
-    # 10) 上漲途中轉弱：月線上方先觀察，不因 KD 高檔過早賣出
+    # 12) 上漲途中轉弱：月線上方先觀察，不因 KD 高檔或短線轉弱過早賣出。
     if (
         position_zone == '上漲途中'
         and above_ma18
@@ -493,21 +591,7 @@ def get_tech_signal(
             'signal_text': _join_reasons(reasons),
         }
 
-    # 11) 上漲途中放量下跌：提高警戒，但未跌破月線前不直接賣出
-    if (
-        position_zone == '上漲途中'
-        and above_ma18
-        and price_volume_state == '價跌量增'
-        and kd_weak
-        and not ma18_fall_break
-    ):
-        return {
-            'signal': '觀察再賣出',
-            'reason': '上漲途中出現價跌量增與動能轉弱，若跌破月線應降低持股',
-            'signal_text': _join_reasons(reasons),
-        }
-
-    # 12) 盤整區：價平量縮或訊號混雜
+    # 13) 盤整區：價平量縮或訊號混雜。
     if (
         position_zone == '盤整區域'
         or price_volume_state in ('價平量縮', '價量中性')
@@ -518,7 +602,7 @@ def get_tech_signal(
             'signal_text': _join_reasons(reasons),
         }
 
-    # 13) 保守預設
+    # 14) 保守預設。
     return {
         'signal': '等待觀察',
         'reason': '價格、量能、KD與布林尚未形成明確方向',

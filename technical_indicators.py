@@ -15,6 +15,14 @@ def add_indicators(df):
         df['MA18'] = df['close'].rolling(18).mean()
         df['MA50'] = df['close'].rolling(50).mean()
 
+        # MACD: 用於判斷主升段動能是否翻正、改善或降溫。
+        # DIF = EMA12 - EMA26, DEA = DIF 的 9 日 EMA, HIST = DIF - DEA。
+        ema12 = df['close'].ewm(span=12, adjust=False).mean()
+        ema26 = df['close'].ewm(span=26, adjust=False).mean()
+        df['MACD_DIF'] = ema12 - ema26
+        df['MACD_DEA'] = df['MACD_DIF'].ewm(span=9, adjust=False).mean()
+        df['MACD_HIST'] = df['MACD_DIF'] - df['MACD_DEA']
+
         std = df['close'].rolling(18).std()
         df['BB_upper'] = df['MA18'] + 2 * std
         df['BB_lower'] = df['MA18'] - 2 * std
