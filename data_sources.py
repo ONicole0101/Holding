@@ -575,3 +575,80 @@ def get_per_pbr_60d_stats(stock_id, days=60):
         print(f"❌ PER/PBR 60D error {stock_id}: {e}")
         return empty
 
+def get_disposition_securities_period(stock_id):
+    """
+    Return active disposition period for one stock from FinMind
+    TaiwanStockDispositionSecuritiesPeriod.
+
+    Only periods where today or tomorrow is inside [period_start, period_end]
+    are returned. Non-matching stocks return blank period fields so AllStatic.csv
+    can keep stable columns without showing inactive disposition periods.
+    """
+    empty = {
+        "period_start": None,
+        "period_end": None,
+        "disposition_period_start": None,
+        "disposition_period_end": None,
+    }
+
+    try:
+        today = datetime.today().date()
+        tomorrow = today + timedelta(days=1)
+        params = {
+            "dataset": "TaiwanStockDispositionSecuritiesPeriod",
+            "data_id": str(stock_id),
+            "start_date": (datetime.today() - timedelta(days=180)).strftime("%Y-%m-%d"),
+            "token": FINMIND_token,
+        }
+
+        _record_finmind_request(
+            "disposition period",
+            stock_id,
+            "TaiwanStockDispositionSecuritiesPeriod",
+        )
+        res = requests.get(API_URL, params=params, headers=headers, timeout=300)
+        res_data = _safe_response_json(res)
+        _print_initial_quota_once(res_data, res)
+
+        if res.status_code != 200:
+            _print_api_status_error("disposition period", stock_id, res, res_data)
+            return empty
+
+        data = res_data.get("data", [])
+        if not data:
+            return empty
+
+        df = pd.DataFrame(data)
+        if "period_start" not in df.columns or "period_end" not in df.columns:
+            print(
+                f"⚠️ disposition period missing period_start/period_end {stock_id}: cols={list(df.columns)}"
+            )
+            return empty
+
+        df["period_start"] = pd.to_datetime(df["period_start"], errors="coerce").dt.date
+        df["period_end"] = pd.to_datetime(df["period_end"], errors="coerce").dt.date
+        df = df.dropna(subset=["period_start", "period_end"])
+        if df.empty:
+            return empty
+
+        mask = (
+            ((df["period_start"] <= today) & (today <= df["period_end"]))
+            | ((df["period_start"] <= tomorrow) & (tomorrow <= df["period_end"]))
+        )
+        active = df.loc[mask].sort_values(["period_end", "period_start"], ascending=[False, False])
+        if active.empty:
+            return empty
+
+        latest = active.iloc[0]
+        period_start = latest["period_start"].strftime("%Y-%m-%d")
+        period_end = latest["period_end"].strftime("%Y-%m-%d")
+        return {
+            "period_start": period_start,
+            "period_end": period_end,
+            "disposition_period_start": period_start,
+            "disposition_period_end": period_end,
+        }
+    except Exception as e:
+        print(f"❌ disposition period error {stock_id}: {e}")
+        return empty
+

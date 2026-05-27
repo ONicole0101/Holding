@@ -10,6 +10,7 @@ import config
 from data_sources import (
     get_revenue_raw,
     get_per_pbr_60d_stats,
+    get_disposition_securities_period,
     get_finmind_user_info,
     get_finmind_token_status,
     log_finmind_static_event,
@@ -31,6 +32,10 @@ DATA_COLS = [
     "pbr_latest", "pbr_60d_high", "pbr_60d_low",
 ]
 
+DISPOSITION_COLS = [
+    "period_start", "period_end",
+]
+
 GROUPS = {
     # Required fields for status. Optional derived fields such as per_Y/per_ttm,
     # QoQ/YoY and 60D high/low should not make a row look empty.
@@ -46,7 +51,7 @@ PREV_FLAG_COLS = [
     "per_latest_is_prev", "pbr_latest_is_prev",
 ]
 
-BASE_COLS = ["stock_id", "name"] + DATA_COLS + PREV_FLAG_COLS + [
+BASE_COLS = ["stock_id", "name"] + DATA_COLS + DISPOSITION_COLS + PREV_FLAG_COLS + [
     "static_updated_at", "static_status", "static_reason",
 ]
 
@@ -466,6 +471,15 @@ def build_static_row(s: dict) -> dict:
             set_group_status(row, "valuation", "api_limited", str(e))
             return finalize_static_status(row)
         set_group_status(row, "valuation", "error", str(e))
+
+    # Disposition securities period. Optional: it does not affect static_status.
+    # Only write period_start/period_end when today or tomorrow is inside the range.
+    try:
+        disposition = get_disposition_securities_period(stock_id) or {}
+        row["period_start"] = disposition.get("period_start")
+        row["period_end"] = disposition.get("period_end")
+    except Exception as e:
+        print(f"❌ disposition period static error {stock_id}: {e}", flush=True)
 
     return finalize_static_status(row)
 

@@ -101,6 +101,18 @@ def to_int_or_none(v):
         return None
 
 
+def to_str_or_none(v):
+    if v is None:
+        return None
+    try:
+        if pd.isna(v):
+            return None
+    except Exception:
+        pass
+    text = str(v).strip()
+    return text if text and text.lower() not in {"nan", "none", "null"} else None
+
+
 def process_stock(s, static_map=None):
     stock_id = str(s["stock_id"])
     name = s["name"]
@@ -464,6 +476,11 @@ def _build_static_fields(static_row):
         "pbr_latest": to_float_or_none(static_row.get("pbr_latest")),
         "pbr_60d_high": to_float_or_none(static_row.get("pbr_60d_high")),
         "pbr_60d_low": to_float_or_none(static_row.get("pbr_60d_low")),
+
+        "period_start": to_str_or_none(static_row.get("period_start")),
+        "period_end": to_str_or_none(static_row.get("period_end")),
+        "disposition_period_start": to_str_or_none(static_row.get("period_start") or static_row.get("disposition_period_start")),
+        "disposition_period_end": to_str_or_none(static_row.get("period_end") or static_row.get("disposition_period_end")),
     }
 
 
