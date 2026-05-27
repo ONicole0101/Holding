@@ -616,7 +616,7 @@
       const start = fmtMonthDay(s.period_start ?? s.disposition_period_start);
       const end = fmtMonthDay(s.period_end ?? s.disposition_period_end);
       if (!start || !end) return "";
-      return `${start}-${end}`;
+      return `${start}<br />${end}`;
     }
 
     function shortName(name) {
