@@ -2,6 +2,19 @@ name: Update Static CSV
 
 on:
   workflow_dispatch:
+    inputs:
+      csv_file:
+        description: "Source stock list file"
+        required: false
+        default: "stocks.csv"
+      output_file:
+        description: "Financial static output file"
+        required: false
+        default: "AllStatic.csv"
+      sleep_sec:
+        description: "Sleep seconds between stocks"
+        required: false
+        default: "0.2"
   schedule:
     # GitHub Actions cron uses UTC.
     # 20:00 UTC = Taiwan time 04:00.
@@ -14,19 +27,80 @@ concurrency:
   group: update-static-csv
   cancel-in-progress: false
 
+env:
+  WORKFLOW_VERSION: "financial-only-20260531-002"
+  CSV_FILE: ${{ github.event.inputs.csv_file || vars.CSV_FILE || 'stocks.csv' }}
+  STATIC_OUTPUT_FILE: ${{ github.event.inputs.output_file || vars.STATIC_OUTPUT_FILE || 'AllStatic.csv' }}
+  STATIC_SLEEP_SEC: ${{ github.event.inputs.sleep_sec || vars.STATIC_SLEEP_SEC || '0.2' }}
+  FINMIND_USAGE_LOG_FILE: /tmp/finmind_token_usage_log.csv
+  FINMIND_TOKEN: ${{ secrets.FINMIND_TOKEN }}
+
 jobs:
   update-static:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Show workflow identity
+        run: |
+          echo "WORKFLOW_VERSION=${WORKFLOW_VERSION}"
+          echo "GITHUB_WORKFLOW=${GITHUB_WORKFLOW}"
+          echo "GITHUB_REF=${GITHUB_REF}"
+          echo "GITHUB_REF_NAME=${GITHUB_REF_NAME}"
+          echo "GITHUB_SHA=${GITHUB_SHA}"
+          echo "CSV_FILE=${CSV_FILE}"
+          echo "STATIC_OUTPUT_FILE=${STATIC_OUTPUT_FILE}"
+          echo "STATIC_SLEEP_SEC=${STATIC_SLEEP_SEC}"
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.ref_name }}
           fetch-depth: 0
+          clean: true
 
       - name: Pull latest before update
         run: |
-          git pull --rebase
+          git pull --rebase --autostash
+
+      - name: Inspect workflow file in runner
+        run: |
+          echo "Current commit:"
+          git rev-parse HEAD
+
+          echo "Workflow files:"
+          find .github/workflows -maxdepth 1 -type f -print | sort
+
+          echo "update_static.yml content:"
+          sed -n '1,240p' .github/workflows/update_static.yml
+
+      - name: Reject legacy static workflow
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path(".github/workflows/update_static.yml")
+          text = path.read_text(encoding="utf-8")
+
+          blocked = [
+              "ch" + "ip",
+              "Ch" + "ip",
+              "CH" + "IP_",
+              "Static_" + "Ch" + "ips",
+              "AllStatic_" + "Ch" + "ip",
+              "AllStatic_" + "Ch" + "ips",
+              "generate_static_" + "ch" + "ips",
+              "ch" + "ips_analysis",
+          ]
+
+          hits = [word for word in blocked if word in text]
+          if hits:
+              print("ERROR: legacy entries still exist in update_static.yml")
+              for word in hits:
+                  print(f"found: {word}")
+              raise SystemExit(1)
+
+          print("OK: financial workflow only")
+          PY
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -38,30 +112,50 @@ jobs:
           python -m pip install --upgrade pip
           pip install pandas requests jinja2 FinMind PyYAML loguru tqdm
 
-      - name: Prepare config for static build
+      - name: Prepare config for financial static build
         run: |
           cat > config.py <<'PY'
-          REPORT_TYPE = "持股"
-          CSV_FILE = "stocks.csv"
-          REPORT_TITLE = "(持股)技術分析報告"
-          OUTPUT_FILE = "持股"
-          STATIC_OUTPUT_FILE = "AllStatic.csv"
+          import os
+
+          REPORT_TYPE = os.getenv("REPORT_TYPE", "持股")
+          CSV_FILE = os.getenv("CSV_FILE", "stocks.csv")
+          REPORT_TITLE = os.getenv("REPORT_TITLE", "(持股)技術分析報告")
+          OUTPUT_FILE = os.getenv("OUTPUT_FILE", "持股")
+          STATIC_OUTPUT_FILE = os.getenv("STATIC_OUTPUT_FILE", "AllStatic.csv")
           PY
 
       - name: Generate AllStatic.csv
-        env:
-          FINMIND_TOKEN: ${{ secrets.FINMIND_TOKEN }}
         run: |
-          python generate_static_csv.py
+          set -o pipefail
+          python generate_static_csv.py \
+            --output "${STATIC_OUTPUT_FILE}" \
+            --sleep-sec "${STATIC_SLEEP_SEC}"
 
-      - name: Commit AllStatic.csv
+      - name: Show changed files
+        run: |
+          git status --short
+
+      - name: Commit financial static CSV
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add AllStatic.csv config.py
-          git diff --cached --quiet || git commit -m "Update AllStatic.csv"
+
+          git add "${STATIC_OUTPUT_FILE}"
+
+          if git diff --cached --quiet; then
+            echo "No financial static changes to commit."
+            exit 0
+          fi
+
+          git commit -m "Update financial static CSV"
+
+      - name: Clean uncommitted runtime files
+        run: |
+          git reset -- .
+          git restore --worktree .
+          git clean -fd
+          git status --short
 
       - name: Push changes
         run: |
-          git pull --rebase
           git push

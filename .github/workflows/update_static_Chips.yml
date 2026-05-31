@@ -1,7 +1,39 @@
-name: Update Static_Chips CSV
-
+name: Update AllStatic_Chips CSV
 on:
   workflow_dispatch:
+    inputs:
+      csv_file:
+        description: Stock list file
+        required: false
+        default: "stocks.csv"
+      output_file:
+        description: Chip static output file
+        required: false
+        default: "AllStatic_Chips.csv"
+      workers:
+        description: Parallel day requests per stock
+        required: false
+        default: "6"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: chip-analysis-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REPORT_TYPE: ${{ vars.REPORT_TYPE || '持股' }}
+  CSV_FILE: ${{ github.event.inputs.csv_file || vars.CSV_FILE || 'stocks.csv' }}
+  REPORT_TITLE: ${{ vars.REPORT_TITLE || '(持股)技術分析報告' }}
+  OUTPUT_FILE: ${{ vars.OUTPUT_FILE || '持股' }}
+  STATIC_OUTPUT_FILE: ${{ vars.STATIC_OUTPUT_FILE || 'AllStatic.csv' }}
+  STATIC_CHIP_OUTPUT_FILE: ${{ github.event.inputs.output_file || 'AllStatic_Chips.csv' }}
+  CHIP_TREND_DAYS: ${{ vars.CHIP_TREND_DAYS || '3' }}
+  CHIP_CONCENTRATION_THRESHOLD: ${{ vars.CHIP_CONCENTRATION_THRESHOLD || '15' }}
+  CHIP_LOOKBACK_DAYS: ${{ vars.CHIP_LOOKBACK_DAYS || '21' }}
+  CHIP_WORKERS: ${{ github.event.inputs.workers || vars.CHIP_WORKERS || '6' }}
+  CHIP_SLEEP_SEC: ${{ vars.CHIP_SLEEP_SEC || '0.05' }}
 
 jobs:
   run-chip-analysis:
@@ -19,12 +51,65 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          else
+            pip install pandas requests jinja2 FinMind PyYAML loguru tqdm
+          fi
 
-      - name: Run chips analysis
+      - name: Show runtime config
+        run: |
+          python - <<'PY'
+          import os
+          for name in [
+              'REPORT_TYPE','CSV_FILE','REPORT_TITLE','OUTPUT_FILE',
+              'STATIC_OUTPUT_FILE','STATIC_CHIP_OUTPUT_FILE',
+              'CHIP_TREND_DAYS','CHIP_CONCENTRATION_THRESHOLD',
+              'CHIP_LOOKBACK_DAYS','CHIP_WORKERS','CHIP_SLEEP_SEC'
+          ]:
+              print(f'{name}={os.environ.get(name)}')
+          PY
+
+      - name: Build chip static file
         env:
           FINMIND_TOKEN: ${{ secrets.FINMIND_TOKEN }}
-          CHIP_TREND_DAYS: 3
-          CHIP_CONCENTRATION_THRESHOLD: 15
+          STATIC_CHIP_FILE: ${{ env.STATIC_CHIP_OUTPUT_FILE }}
+          STATIC_CHIPS_FILE: ${{ env.STATIC_CHIP_OUTPUT_FILE }}
         run: |
-          python chips_analysis.py
+          set -o pipefail
+          python generate_static_chips.py \
+            --no-prompt \
+            --csv-file "${CSV_FILE}" \
+            --output "${STATIC_CHIP_OUTPUT_FILE}" \
+            --trend-days "${CHIP_TREND_DAYS}" \
+            --concentration-threshold "${CHIP_CONCENTRATION_THRESHOLD}" \
+            --lookback-days "${CHIP_LOOKBACK_DAYS}" \
+            --sleep-sec "${CHIP_SLEEP_SEC}" \
+            --workers "${CHIP_WORKERS}" \
+            2>&1 | tee chips_analysis_action.log
+          python - <<'PY' | tee -a chips_analysis_action.log
+          import os
+          import pandas as pd
+          path = os.environ['STATIC_CHIP_OUTPUT_FILE']
+          df = pd.read_csv(path, encoding='utf-8-sig', dtype=str)
+          cols = ['stock_id','name','chip_latest_date','main_force_net','broker_diff','chip_signal_state','chips_status']
+          print(df[cols].head(30).to_string(index=False))
+          print('rows=', len(df))
+          print('status=', df['chips_status'].value_counts(dropna=False).to_dict())
+          PY
+
+      - name: Upload chip artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: chip-static
+          path: |
+            ${{ env.STATIC_CHIP_OUTPUT_FILE }}
+            chips_analysis_action.log
+
+      - name: Commit chip static file
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "${STATIC_CHIP_OUTPUT_FILE}" chips_analysis_action.log
+          git diff --cached --quiet || git commit -m "Update ${STATIC_CHIP_OUTPUT_FILE}"
+          git push
