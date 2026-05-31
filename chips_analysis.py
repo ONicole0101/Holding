@@ -2,12 +2,15 @@ import argparse
 import datetime as dt
 import os
 import sys
-import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 import requests
+
+try:
+    from FinMind.data import DataLoader
+except Exception:  # FinMind may not be installed in local lint environments
+    DataLoader = None
 
 try:
     import config  # type: ignore
@@ -19,16 +22,7 @@ USER_INFO_URL = "https://api.web.finmindtrade.com/v2/user_info"
 TOKEN = os.getenv("FINMIND_TOKEN")
 HEADERS = {"Authorization": f"Bearer {TOKEN}"} if TOKEN else {}
 
-DEFAULT_OUTPUT_FILE = "AllStatic_Chip.csv"
-
-# FinMind official note: TaiwanStockTradingDailyReport is too large for ranges.
-# Request one day at a time. Known missing dates are skipped to avoid false errors.
-MISSING_DATE_RANGES = [
-    (dt.date(2022, 10, 31), dt.date(2022, 11, 3)),
-    (dt.date(2023, 1, 11), dt.date(2023, 1, 17)),
-]
-
-STATIC_CHIP_COLUMNS = [
+STATIC_CHIPS_COLUMNS = [
     "stock_id",
     "name",
     "chip_trend_days",
@@ -70,7 +64,7 @@ def mask_token(token: Optional[str] = None) -> str:
     return token[:4] + "..." + token[-4:]
 
 
-def compact_text(text: Any, max_len: int = 220) -> str:
+def compact_text(text: Any, max_len: int = 180) -> str:
     text = " ".join(str(text or "").replace("\n", " ").split())
     if len(text) <= max_len:
         return text
@@ -97,6 +91,7 @@ def get_finmind_meta() -> Dict[str, Any]:
     }
     if not TOKEN:
         return info
+
     try:
         res = requests.get(USER_INFO_URL, headers=HEADERS, timeout=60)
         data = safe_json(res)
@@ -111,9 +106,8 @@ def get_finmind_meta() -> Dict[str, Any]:
             "finmind_api_request_limit": limit_int,
             "finmind_remain": remain,
         })
-    except Exception as exc:
+    except Exception:
         info["finmind_token_status"] = "error"
-        print(f"⚠️ cannot check FinMind user_info: {exc}", flush=True)
     return info
 
 
@@ -158,24 +152,17 @@ def resolve_csv_file(csv_file: Optional[str] = None) -> str:
 def resolve_output(output_file: Optional[str] = None) -> str:
     if output_file:
         return output_file
-    if os.getenv("STATIC_CHIP_FILE"):
-        return os.getenv("STATIC_CHIP_FILE", DEFAULT_OUTPUT_FILE)
     if os.getenv("STATIC_CHIPS_FILE"):
-        return os.getenv("STATIC_CHIPS_FILE", DEFAULT_OUTPUT_FILE)
-    if config is not None:
-        for attr in ("STATIC_CHIP_OUTPUT_FILE", "STATIC_CHIPS_OUTPUT_FILE"):
-            if getattr(config, attr, None):
-                return getattr(config, attr)
-    return DEFAULT_OUTPUT_FILE
+        return os.getenv("STATIC_CHIPS_FILE", "Static_Chips.csv")
+    if config is not None and getattr(config, "STATIC_CHIPS_OUTPUT_FILE", None):
+        return getattr(config, "STATIC_CHIPS_OUTPUT_FILE")
+    return "Static_Chips.csv"
 
 
 def load_stock_list(csv_file: str) -> List[Dict[str, str]]:
     if not os.path.exists(csv_file):
         raise FileNotFoundError(f"stock csv not found: {csv_file}")
     df = pd.read_csv(csv_file, sep="\t", encoding="utf-8-sig", dtype=str)
-    if len(df.columns) == 1:
-        # tolerate comma separated files too
-        df = pd.read_csv(csv_file, encoding="utf-8-sig", dtype=str)
     df.columns = df.columns.str.strip()
     if "Ticker" in df.columns:
         df = df.rename(columns={"Ticker": "stock_id"})
@@ -191,78 +178,44 @@ def load_stock_list(csv_file: str) -> List[Dict[str, str]]:
     return df[["stock_id", "name"]].to_dict(orient="records")
 
 
-def is_known_missing_date(day: dt.date) -> bool:
-    return any(start <= day <= end for start, end in MISSING_DATE_RANGES)
-
-
-def iter_candidate_dates(start_date: dt.date, end_date: dt.date) -> List[dt.date]:
-    days: List[dt.date] = []
-    cur = start_date
-    while cur <= end_date:
-        if not is_known_missing_date(cur):
-            days.append(cur)
-        cur += dt.timedelta(days=1)
-    return days
-
-
-def fetch_trading_daily_report_one_day(stock_id: str, day: dt.date, verbose: bool = True) -> pd.DataFrame:
-    # Do NOT send end_date. FinMind returns 400 for this dataset when end_date is present.
+def fetch_trading_daily_report(stock_id: str, start_date: dt.date, end_date: dt.date) -> pd.DataFrame:
     params = {
         "dataset": "TaiwanStockTradingDailyReport",
         "data_id": str(stock_id),
-        "start_date": day.strftime("%Y-%m-%d"),
+        "start_date": start_date.strftime("%Y-%m-%d"),
+        "end_date": end_date.strftime("%Y-%m-%d"),
         "token": TOKEN,
     }
-    if verbose:
-        print(
-            "🔎 chip analysis request: "
-            f"dataset={params['dataset']} stock_id={stock_id} "
-            f"date={params['start_date']} token_present={bool(TOKEN)}",
-            flush=True,
-        )
+    print(
+        "🔎 chip analysis request: "
+        f"dataset={params['dataset']} stock_id={stock_id} "
+        f"start={params['start_date']} end={params['end_date']} token_present={bool(TOKEN)}",
+        flush=True,
+    )
     res = requests.get(API_URL, params=params, headers=HEADERS, timeout=300)
-    if verbose:
-        print(f"🔄 chip analysis response status: {res.status_code}", flush=True)
+    print(f"🔄 chip analysis response status: {res.status_code}", flush=True)
     data = safe_json(res)
     if res.status_code != 200:
         msg = data.get("msg") or data.get("message") or res.text[:200]
-        raise RuntimeError(f"FinMind TaiwanStockTradingDailyReport error {stock_id} {day}: {res.status_code} {msg}")
+        raise RuntimeError(f"FinMind TaiwanStockTradingDailyReport error {stock_id}: {res.status_code} {msg}")
     rows = data.get("data", [])
     return pd.DataFrame(rows)
 
 
-def fetch_trading_daily_report_days(stock_id: str, days: List[dt.date], workers: int = 1, verbose: bool = True) -> pd.DataFrame:
-    frames: List[pd.DataFrame] = []
-    errors: List[str] = []
-    if workers <= 1:
-        for day in days:
-            try:
-                df = fetch_trading_daily_report_one_day(stock_id, day, verbose=verbose)
-                if not df.empty:
-                    frames.append(df)
-            except Exception as exc:
-                errors.append(str(exc))
-                print(f"⚠️ chip day failed {stock_id} {day}: {exc}", flush=True)
-        if errors and not frames:
-            print(f"⚠️ all chip day requests failed {stock_id}; first={errors[0]}", flush=True)
-        return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
-
-    with ThreadPoolExecutor(max_workers=workers) as executor:
-        future_map = {executor.submit(fetch_trading_daily_report_one_day, stock_id, day, False): day for day in days}
-        for future in as_completed(future_map):
-            day = future_map[future]
-            try:
-                df = future.result()
-                if verbose:
-                    print(f"🔄 chip day done stock_id={stock_id} date={day} rows={len(df)}", flush=True)
-                if not df.empty:
-                    frames.append(df)
-            except Exception as exc:
-                errors.append(str(exc))
-                print(f"⚠️ chip day failed {stock_id} {day}: {exc}", flush=True)
-    if errors and not frames:
-        print(f"⚠️ all chip day requests failed {stock_id}; first={errors[0]}", flush=True)
-    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+def fetch_broker_bs_fallback(stock_id: str, start_date: dt.date) -> pd.DataFrame:
+    if DataLoader is None:
+        return pd.DataFrame()
+    try:
+        dl = DataLoader()
+        if TOKEN:
+            dl.login_by_token(api_token=TOKEN)
+        df = dl.taiwan_stock_broker_bs(stock_id=str(stock_id), start_date=start_date.strftime("%Y-%m-%d"))
+        if df is None:
+            return pd.DataFrame()
+        return df.copy()
+    except Exception as exc:
+        print(f"⚠️ fallback TaiwanStockBrokerBS failed {stock_id}: {exc}", flush=True)
+        return pd.DataFrame()
 
 
 def normalize_chip_source(df: pd.DataFrame, stock_id: str, end_date: dt.date) -> pd.DataFrame:
@@ -270,6 +223,7 @@ def normalize_chip_source(df: pd.DataFrame, stock_id: str, end_date: dt.date) ->
         return pd.DataFrame()
     df = df.copy()
     df.columns = df.columns.str.strip()
+
     broker_col = next(
         (c for c in ["broker", "securities_trader", "securities_trader_id", "securities_trader_name"] if c in df.columns),
         None,
@@ -277,14 +231,17 @@ def normalize_chip_source(df: pd.DataFrame, stock_id: str, end_date: dt.date) ->
     if broker_col is None:
         print(f"⚠️ chip data has no broker-like column {stock_id}: cols={list(df.columns)}", flush=True)
         return pd.DataFrame()
+
     if "stock_id" in df.columns:
         df = df[df["stock_id"].astype(str).str.strip() == str(stock_id)]
     if df.empty:
         return pd.DataFrame()
+
     required = {"date", "buy", "sell"}
     if not required.issubset(df.columns):
         print(f"⚠️ chip data missing required columns {stock_id}: cols={list(df.columns)}", flush=True)
         return pd.DataFrame()
+
     df["date"] = pd.to_datetime(df["date"], errors="coerce").dt.date
     df["buy"] = pd.to_numeric(df["buy"], errors="coerce").fillna(0)
     df["sell"] = pd.to_numeric(df["sell"], errors="coerce").fillna(0)
@@ -298,20 +255,22 @@ def normalize_chip_source(df: pd.DataFrame, stock_id: str, end_date: dt.date) ->
 
 
 def summarize_daily(df: pd.DataFrame) -> pd.DataFrame:
+    daily_rows: List[Dict[str, Any]] = []
     if df.empty:
         return pd.DataFrame()
-    daily_rows: List[Dict[str, Any]] = []
     for date_value, group in df.groupby("date"):
         group = group.copy()
         active_buyers = group.loc[group["buy"] > 0, "broker_key"].nunique()
         active_sellers = group.loc[group["sell"] > 0, "broker_key"].nunique()
         broker_diff = int(active_buyers - active_sellers)
+
         sorted_group = group.sort_values("net_buy", ascending=False)
         top_buy = float(sorted_group.head(15)["net_buy"].sum())
         top_sell = float(sorted_group.tail(15)["net_buy"].sum())
         main_force_net = top_buy + top_sell
         total_turnover = float((group["buy"] + group["sell"]).sum())
         concentration_pct = abs(main_force_net) / total_turnover * 100 if total_turnover else None
+
         daily_rows.append({
             "date": date_value,
             "main_force_net": main_force_net,
@@ -338,19 +297,28 @@ def no_data_result(trend_days: int, concentration_threshold: float, reason: str 
     }
 
 
-def analyze_chip(stock_id: str, trend_days: int, concentration_threshold: float, workers: int = 1, lookback_days: Optional[int] = None) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+def analyze_chip(stock_id: str, trend_days: int, concentration_threshold: float) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+    start_date = dt.date.today() - dt.timedelta(days=max(trend_days * 7, 21))
     end_date = dt.date.today()
-    start_date = end_date - dt.timedelta(days=lookback_days or max(trend_days * 7, 21))
-    days = iter_candidate_dates(start_date, end_date)
-    raw = fetch_trading_daily_report_days(stock_id, days, workers=workers, verbose=(workers <= 1))
-    df = normalize_chip_source(raw, stock_id, end_date)
+
+    try:
+        raw = fetch_trading_daily_report(stock_id, start_date, end_date)
+        df = normalize_chip_source(raw, stock_id, end_date)
+        if df.empty:
+            print(f"⚠️ TaiwanStockTradingDailyReport empty, try TaiwanStockBrokerBS fallback {stock_id}", flush=True)
+            df = normalize_chip_source(fetch_broker_bs_fallback(stock_id, start_date), stock_id, end_date)
+    except Exception as exc:
+        print(f"⚠️ primary chip source failed {stock_id}: {exc}", flush=True)
+        df = normalize_chip_source(fetch_broker_bs_fallback(stock_id, start_date), stock_id, end_date)
+
     report = summarize_daily(df)
     if report.empty:
         return pd.DataFrame(), no_data_result(
             trend_days,
             concentration_threshold,
-            "未抓取到籌碼資料；請確認 TaiwanStockTradingDailyReport 單日請求、資料更新時間與 API 權限。",
+            "未抓取到籌碼資料，可能非交易日、資料尚未更新、API 權限不足或欄位格式改變。",
         )
+
     recent = report.head(trend_days).copy()
     available_days = len(recent)
     if available_days == 0:
@@ -368,8 +336,8 @@ def analyze_chip(stock_id: str, trend_days: int, concentration_threshold: float,
     main_score = score_by_ratio((main_pos - main_neg) / denom)
     broker_score = score_by_ratio((diff_pos - diff_neg) / denom)
     concentration_score = score_by_ratio((conc_pos - conc_neg) / denom)
-    latest = recent.iloc[0]
 
+    latest = recent.iloc[0]
     state = "neutral"
     text = "籌碼震盪，方向未定"
     enough_days = available_days >= trend_days
@@ -394,7 +362,8 @@ def analyze_chip(stock_id: str, trend_days: int, concentration_threshold: float,
         "chip_concentration_threshold": concentration_threshold,
         "chip_latest_date": str(latest["date"]),
         "chip_available_days": int(available_days),
-        "chip_concentration_pct": round(float(latest["chip_concentration_pct"]), 2) if pd.notna(latest["chip_concentration_pct"]) else None,
+        "chip_concentration_pct": round(float(latest["chip_concentration_pct"]), 2)
+        if pd.notna(latest["chip_concentration_pct"]) else None,
         "chip_concentration_score": concentration_score,
         "main_force_net": int(round(float(latest["main_force_net"]))),
         "main_force_score": main_score,
@@ -403,6 +372,7 @@ def analyze_chip(stock_id: str, trend_days: int, concentration_threshold: float,
         "chip_signal_state": state,
         "chip_signal_text": text,
     }
+
     display = recent.rename(columns={
         "date": "Date",
         "main_force_net": "主力買賣超",
@@ -415,7 +385,7 @@ def analyze_chip(stock_id: str, trend_days: int, concentration_threshold: float,
 
 
 def build_row(stock: Dict[str, str], chip_result: Dict[str, Any], meta: Dict[str, Any]) -> Dict[str, Any]:
-    row = {column: None for column in STATIC_CHIP_COLUMNS}
+    row = {column: None for column in STATIC_CHIPS_COLUMNS}
     row.update({
         "stock_id": str(stock.get("stock_id", "")).strip(),
         "name": stock.get("name", ""),
@@ -436,6 +406,7 @@ def build_row(stock: Dict[str, str], chip_result: Dict[str, Any], meta: Dict[str
         "chip_signal_text",
     ]:
         row[key] = chip_result.get(key)
+
     state = str(chip_result.get("chip_signal_state") or "").strip().lower()
     row["chips_status"] = "ok" if state not in {"", "no_data", "error"} else state or "no_data"
     row["chips_reason"] = "" if row["chips_status"] == "ok" else compact_text(chip_result.get("chip_signal_text"))
@@ -445,26 +416,24 @@ def build_row(stock: Dict[str, str], chip_result: Dict[str, Any], meta: Dict[str
 
 def save_rows(rows: List[Dict[str, Any]], output_file: str) -> None:
     df = pd.DataFrame(rows)
-    for column in STATIC_CHIP_COLUMNS:
+    for column in STATIC_CHIPS_COLUMNS:
         if column not in df.columns:
             df[column] = None
-    df = df[STATIC_CHIP_COLUMNS]
+    df = df[STATIC_CHIPS_COLUMNS]
     tmp = output_file + ".tmp"
     df.to_csv(tmp, index=False, encoding="utf-8-sig")
     os.replace(tmp, output_file)
-    print(f"✅ Static chip saved: {output_file}, rows={len(df)}", flush=True)
+    print(f"✅ Static chips saved: {output_file}, rows={len(df)}", flush=True)
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Build AllStatic_Chip.csv from FinMind broker chip data")
+    parser = argparse.ArgumentParser(description="Build Static_Chips.csv from FinMind broker chip data")
     parser.add_argument("--stock-id", default=os.getenv("CHIP_STOCK_ID"), help="Analyze one stock only. If omitted, stocks.csv is used.")
     parser.add_argument("--csv-file", default=None, help="Stock list TSV/CSV path. Default: config.CSV_FILE or stocks.csv")
-    parser.add_argument("--output", default=None, help=f"Output CSV. Default: {DEFAULT_OUTPUT_FILE}")
+    parser.add_argument("--output", default=None, help="Output CSV. Default: STATIC_CHIPS_FILE or Static_Chips.csv")
     parser.add_argument("--trend-days", type=int, default=read_int_env("CHIP_TREND_DAYS", 3))
     parser.add_argument("--concentration-threshold", type=float, default=read_float_env("CHIP_CONCENTRATION_THRESHOLD", 15))
-    parser.add_argument("--lookback-days", type=int, default=read_int_env("CHIP_LOOKBACK_DAYS", 21, min_value=3, max_value=90))
-    parser.add_argument("--sleep-sec", type=float, default=float(os.getenv("CHIP_SLEEP_SEC", "0.05")))
-    parser.add_argument("--workers", type=int, default=read_int_env("CHIP_WORKERS", 1, min_value=1, max_value=16), help="Parallel day requests per stock. Keep low if API rate limit is tight.")
+    parser.add_argument("--sleep-sec", type=float, default=float(os.getenv("CHIP_SLEEP_SEC", "0.2")))
     parser.add_argument("--no-prompt", action="store_true", help="Kept for workflow compatibility; no prompts are used in batch mode")
     return parser.parse_args()
 
@@ -473,13 +442,14 @@ def main() -> int:
     args = parse_args()
     trend_days = max(1, min(int(args.trend_days), 20))
     concentration_threshold = max(0.0, min(float(args.concentration_threshold), 100.0))
-    workers = max(1, min(int(args.workers), 16))
     output_file = resolve_output(args.output)
     meta = get_finmind_meta()
-    print(f"FINMIND token present={bool(TOKEN)} status={meta.get('finmind_token_status')} remain={meta.get('finmind_remain')}", flush=True)
-    print("FinMind note: TaiwanStockTradingDailyReport only supports one day per request; no end_date is sent.", flush=True)
-    print("FinMind note: data usually updates Mon-Fri 21:00 Taiwan time; actual availability follows API data.", flush=True)
-    print(f"籌碼參數：天數={trend_days}，集中度門檻={concentration_threshold:g}%，lookback={args.lookback_days}天，workers={workers}", flush=True)
+
+    print(
+        f"FINMIND token present={bool(TOKEN)} status={meta.get('finmind_token_status')} remain={meta.get('finmind_remain')}",
+        flush=True,
+    )
+    print(f"籌碼參數：天數={trend_days}，集中度門檻={concentration_threshold:g}%", flush=True)
 
     if args.stock_id:
         stocks = [{"stock_id": str(args.stock_id).strip(), "name": ""}]
@@ -493,27 +463,27 @@ def main() -> int:
         sid = str(stock.get("stock_id", "")).strip()
         print(f"正在分析 {idx}/{len(stocks)} {sid} {stock.get('name', '')}...", flush=True)
         try:
-            recent_df, chip_result = analyze_chip(sid, trend_days, concentration_threshold, workers=workers, lookback_days=args.lookback_days)
+            recent_df, chip_result = analyze_chip(sid, trend_days, concentration_threshold)
         except Exception as exc:
             print(f"❌ chip analysis failed {sid}: {exc}", flush=True)
             recent_df = pd.DataFrame()
             chip_result = no_data_result(trend_days, concentration_threshold, f"chip analysis error: {exc}")
             chip_result["chip_signal_state"] = "error"
+
         if args.stock_id:
             print(f"\n【最近 {trend_days} 個交易日籌碼數據】")
             print(recent_df.to_string(index=False) if not recent_df.empty else "無足夠籌碼資料可供顯示")
             print("-" * 40)
             print(chip_result.get("chip_signal_text"))
+
         rows.append(build_row(stock, chip_result, meta))
         if args.sleep_sec and args.sleep_sec > 0 and idx < len(stocks):
+            import time
             time.sleep(args.sleep_sec)
 
     save_rows(rows, output_file)
-    final_df = pd.DataFrame(rows)
-    status_counts = final_df["chips_status"].astype(str).value_counts().to_dict() if not final_df.empty else {}
-    print(f"AllStatic_Chip status summary: {status_counts}", flush=True)
-    preview_cols = ["stock_id", "name", "chip_latest_date", "main_force_net", "broker_diff", "chip_signal_state", "chips_status"]
-    print(final_df[preview_cols].head(30).to_string(index=False), flush=True)
+    status_counts = pd.Series([r.get("chips_status") for r in rows]).value_counts().to_dict() if rows else {}
+    print(f"Static_Chips status summary: {status_counts}", flush=True)
     return 0
 
 
