@@ -1,202 +1,82 @@
-name: Update Static Chips V2
-
+name: Update Static_Chips CSV
 on:
   workflow_dispatch:
     inputs:
       csv_file:
-        description: "Source stock list file"
+        description: Stock list file
         required: false
         default: "stocks.csv"
       output_file:
-        description: "Chip static output file"
+        description: Chip static output file
         required: false
-        default: "AllStatic_Chips.csv"
-      trend_days:
-        description: "Chip trend days"
-        required: false
-        default: "3"
-      concentration_threshold:
-        description: "Chip concentration threshold percent"
-        required: false
-        default: "15"
-      lookback_days:
-        description: "Lookback calendar days"
-        required: false
-        default: "21"
+        default: "AllStatic_Chip.csv"
       workers:
-        description: "Parallel stock workers"
+        description: Parallel day requests per stock
         required: false
         default: "6"
-      sleep_sec:
-        description: "Small stagger between parallel tasks"
-        required: false
-        default: "0"
-      log_every:
-        description: "Print one progress line every N completed stocks. 0 = only final/errors"
-        required: false
-        default: "25"
-      verbose:
-        description: "Verbose API logs. Use 1 only for debugging"
-        required: false
-        default: "0"
-
-  schedule:
-    # GitHub Actions cron uses UTC.
-    # 21:30 UTC = Taiwan time 05:30.
-    - cron: "30 21 * * *"
 
 permissions:
   contents: write
-  actions: read
 
 concurrency:
-  group: update-static-chips-v2
+  group: chip-analysis-${{ github.ref }}
   cancel-in-progress: false
 
 env:
-  WORKFLOW_VERSION: "chips-static-v2-20260531-verify-001"
-
+  REPORT_TYPE: ${{ vars.REPORT_TYPE || '持股' }}
   CSV_FILE: ${{ github.event.inputs.csv_file || vars.CSV_FILE || 'stocks.csv' }}
-  STATIC_CHIP_OUTPUT_FILE: ${{ github.event.inputs.output_file || vars.STATIC_CHIP_OUTPUT_FILE || vars.STATIC_CHIPS_OUTPUT_FILE || 'AllStatic_Chips.csv' }}
-
-  CHIP_TREND_DAYS: ${{ github.event.inputs.trend_days || vars.CHIP_TREND_DAYS || '3' }}
-  CHIP_CONCENTRATION_THRESHOLD: ${{ github.event.inputs.concentration_threshold || vars.CHIP_CONCENTRATION_THRESHOLD || '15' }}
-  CHIP_LOOKBACK_DAYS: ${{ github.event.inputs.lookback_days || vars.CHIP_LOOKBACK_DAYS || '21' }}
+  REPORT_TITLE: ${{ vars.REPORT_TITLE || '(持股)技術分析報告' }}
+  OUTPUT_FILE: ${{ vars.OUTPUT_FILE || '持股' }}
+  STATIC_OUTPUT_FILE: ${{ vars.STATIC_OUTPUT_FILE || 'AllStatic.csv' }}
+  STATIC_CHIP_OUTPUT_FILE: ${{ github.event.inputs.output_file || vars.STATIC_CHIP_OUTPUT_FILE || 'AllStatic_Chip.csv' }}
+  CHIP_TREND_DAYS: ${{ vars.CHIP_TREND_DAYS || '3' }}
+  CHIP_CONCENTRATION_THRESHOLD: ${{ vars.CHIP_CONCENTRATION_THRESHOLD || '15' }}
+  CHIP_LOOKBACK_DAYS: ${{ vars.CHIP_LOOKBACK_DAYS || '21' }}
   CHIP_WORKERS: ${{ github.event.inputs.workers || vars.CHIP_WORKERS || '6' }}
-  CHIP_SLEEP_SEC: ${{ github.event.inputs.sleep_sec || vars.CHIP_SLEEP_SEC || '0' }}
-  CHIP_LOG_EVERY: ${{ github.event.inputs.log_every || vars.CHIP_LOG_EVERY || '25' }}
-  CHIP_VERBOSE: ${{ github.event.inputs.verbose || vars.CHIP_VERBOSE || '0' }}
-  CHIP_SUPPRESS_API_LOGS: ${{ vars.CHIP_SUPPRESS_API_LOGS || '1' }}
-
-  FINMIND_TOKEN: ${{ secrets.FINMIND_TOKEN }}
-  FINMIND_USAGE_LOG_FILE: /tmp/finmind_token_usage_log.csv
+  CHIP_SLEEP_SEC: ${{ vars.CHIP_SLEEP_SEC || '0.05' }}
 
 jobs:
-  update-static-chips:
+  run-chip-analysis:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Show workflow identity before checkout
-        run: |
-          echo "WORKFLOW_VERSION=${WORKFLOW_VERSION}"
-          echo "GITHUB_REPOSITORY=${GITHUB_REPOSITORY}"
-          echo "GITHUB_WORKFLOW=${GITHUB_WORKFLOW}"
-          echo "GITHUB_REF=${GITHUB_REF}"
-          echo "GITHUB_REF_NAME=${GITHUB_REF_NAME}"
-          echo "GITHUB_SHA=${GITHUB_SHA}"
-          echo "CSV_FILE=${CSV_FILE}"
-          echo "STATIC_CHIP_OUTPUT_FILE=${STATIC_CHIP_OUTPUT_FILE}"
-          echo "CHIP_TREND_DAYS=${CHIP_TREND_DAYS}"
-          echo "CHIP_CONCENTRATION_THRESHOLD=${CHIP_CONCENTRATION_THRESHOLD}"
-          echo "CHIP_LOOKBACK_DAYS=${CHIP_LOOKBACK_DAYS}"
-          echo "CHIP_WORKERS=${CHIP_WORKERS}"
-          echo "CHIP_SLEEP_SEC=${CHIP_SLEEP_SEC}"
-          echo "CHIP_LOG_EVERY=${CHIP_LOG_EVERY}"
-          echo "CHIP_VERBOSE=${CHIP_VERBOSE}"
-          echo "CHIP_SUPPRESS_API_LOGS=${CHIP_SUPPRESS_API_LOGS}"
-
-      - name: Checkout selected branch
+      - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.ref_name }}
-          fetch-depth: 0
-          clean: true
-
-      - name: Pull latest selected branch
-        run: |
-          git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
-
-      - name: Verify checked out code and workflow
-        run: |
-          echo "Checked out HEAD:"
-          git rev-parse HEAD
-          git log -1 --oneline
-
-          echo "Workflow files:"
-          find .github/workflows -maxdepth 1 -type f -print | sort
-
-          echo "Current workflow file candidates:"
-          grep -Rni "Update Static Chips" .github/workflows || true
-
-          echo "generate_static_chips.py file info:"
-          pwd
-          ls -l generate_static_chips.py
-
-          echo "First 80 lines of generate_static_chips.py:"
-          sed -n '1,80p' generate_static_chips.py
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pandas requests jinja2 FinMind PyYAML loguru tqdm
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          else
+            pip install pandas requests jinja2 FinMind PyYAML loguru tqdm
+          fi
 
-      - name: Verify generate_static_chips.py supports required arguments
+      - name: Show runtime config
         run: |
-          echo "generate_static_chips.py help:"
-          python generate_static_chips.py --help | sed -n '1,180p'
-
           python - <<'PY'
-          import subprocess
-          import sys
-          from pathlib import Path
-
-          script = Path("generate_static_chips.py")
-          if not script.exists():
-              print("ERROR: generate_static_chips.py not found at repo root")
-              raise SystemExit(1)
-
-          help_text = subprocess.check_output(
-              [sys.executable, "generate_static_chips.py", "--help"],
-              text=True,
-              stderr=subprocess.STDOUT,
-          )
-
-          required = [
-              "--no-prompt",
-              "--csv-file",
-              "--output",
-              "--trend-days",
-              "--concentration-threshold",
-              "--lookback-days",
-              "--workers",
-              "--sleep-sec",
-          ]
-
-          missing = [arg for arg in required if arg not in help_text]
-          if missing:
-              print("ERROR: runner is using OLD generate_static_chips.py")
-              print("Missing args:", ", ".join(missing))
-              print("")
-              print("This means the Actions runner did not checkout the file you expected.")
-              print("Check GITHUB_REF_NAME, branch selected in Run workflow, and repo path.")
-              raise SystemExit(1)
-
-          print("OK: generate_static_chips.py supports workflow arguments")
-          PY
-
-      - name: Prepare runtime config
-        run: |
-          cat > config.py <<'PY'
           import os
-
-          REPORT_TYPE = os.getenv("REPORT_TYPE", "持股")
-          CSV_FILE = os.getenv("CSV_FILE", "stocks.csv")
-          REPORT_TITLE = os.getenv("REPORT_TITLE", "(持股)技術分析報告")
-          OUTPUT_FILE = os.getenv("OUTPUT_FILE", "持股")
-          STATIC_OUTPUT_FILE = os.getenv("STATIC_OUTPUT_FILE", "AllStatic.csv")
-          STATIC_CHIP_OUTPUT_FILE = os.getenv("STATIC_CHIP_OUTPUT_FILE", "AllStatic_Chips.csv")
-          STATIC_CHIPS_OUTPUT_FILE = os.getenv("STATIC_CHIP_OUTPUT_FILE", "AllStatic_Chips.csv")
+          for name in [
+              'REPORT_TYPE','CSV_FILE','REPORT_TITLE','OUTPUT_FILE',
+              'STATIC_OUTPUT_FILE','STATIC_CHIP_OUTPUT_FILE',
+              'CHIP_TREND_DAYS','CHIP_CONCENTRATION_THRESHOLD',
+              'CHIP_LOOKBACK_DAYS','CHIP_WORKERS','CHIP_SLEEP_SEC'
+          ]:
+              print(f'{name}={os.environ.get(name)}')
           PY
 
-      - name: Generate AllStatic_Chips.csv
+      - name: Build chip static file
+        env:
+          FINMIND_TOKEN: ${{ secrets.FINMIND_TOKEN }}
+          STATIC_CHIP_FILE: ${{ env.STATIC_CHIP_OUTPUT_FILE }}
+          STATIC_CHIPS_FILE: ${{ env.STATIC_CHIP_OUTPUT_FILE }}
         run: |
           set -o pipefail
-
           python generate_static_chips.py \
             --no-prompt \
             --csv-file "${CSV_FILE}" \
@@ -204,110 +84,32 @@ jobs:
             --trend-days "${CHIP_TREND_DAYS}" \
             --concentration-threshold "${CHIP_CONCENTRATION_THRESHOLD}" \
             --lookback-days "${CHIP_LOOKBACK_DAYS}" \
-            --workers "${CHIP_WORKERS}" \
             --sleep-sec "${CHIP_SLEEP_SEC}" \
-            --log-every "${CHIP_LOG_EVERY}" \
-            2>&1 | tee /tmp/chips_action.log
-
-      - name: Validate output file
-        run: |
-          if [ ! -f "${STATIC_CHIP_OUTPUT_FILE}" ]; then
-            echo "ERROR: output file not found: ${STATIC_CHIP_OUTPUT_FILE}"
-            exit 1
-          fi
-
-          echo "Output file:"
-          ls -lh "${STATIC_CHIP_OUTPUT_FILE}"
-
-          echo "First 5 lines:"
-          head -n 5 "${STATIC_CHIP_OUTPUT_FILE}"
-
-          python - <<'PY'
+            --workers "${CHIP_WORKERS}" \
+            2>&1 | tee chips_analysis_action.log
+          python - <<'PY' | tee -a chips_analysis_action.log
           import os
           import pandas as pd
-
-          path = os.environ["STATIC_CHIP_OUTPUT_FILE"]
-          df = pd.read_csv(path, encoding="utf-8-sig", dtype=str)
-
-          required = [
-              "stock_id",
-              "name",
-              "chip_latest_date",
-              "main_force_net",
-              "broker_diff",
-              "chip_signal_state",
-              "chips_status",
-          ]
-
-          missing = [col for col in required if col not in df.columns]
-          if missing:
-              print("ERROR: output missing required columns:", missing)
-              raise SystemExit(1)
-
-          print(f"Output rows={len(df)}")
-          print("Status counts:")
-          print(df["chips_status"].fillna("").value_counts().to_string())
+          path = os.environ['STATIC_CHIP_OUTPUT_FILE']
+          df = pd.read_csv(path, encoding='utf-8-sig', dtype=str)
+          cols = ['stock_id','name','chip_latest_date','main_force_net','broker_diff','chip_signal_state','chips_status']
+          print(df[cols].head(30).to_string(index=False))
+          print('rows=', len(df))
+          print('status=', df['chips_status'].value_counts(dropna=False).to_dict())
           PY
 
-      - name: Write short chips summary
-        if: always()
-        run: |
-          {
-            echo "workflow=${GITHUB_WORKFLOW}"
-            echo "workflow_version=${WORKFLOW_VERSION}"
-            echo "repo=${GITHUB_REPOSITORY}"
-            echo "branch=${GITHUB_REF_NAME}"
-            echo "sha=${GITHUB_SHA}"
-            echo "csv_file=${CSV_FILE}"
-            echo "output=${STATIC_CHIP_OUTPUT_FILE}"
-            echo "trend_days=${CHIP_TREND_DAYS}"
-            echo "threshold=${CHIP_CONCENTRATION_THRESHOLD}"
-            echo "lookback_days=${CHIP_LOOKBACK_DAYS}"
-            echo "workers=${CHIP_WORKERS}"
-            echo "log_every=${CHIP_LOG_EVERY}"
-            echo ""
-            echo "Last 80 action log lines:"
-            tail -n 80 /tmp/chips_action.log 2>/dev/null || true
-          } > chips_summary.log
+      - name: Upload chip artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: chip-static
+          path: |
+            ${{ env.STATIC_CHIP_OUTPUT_FILE }}
+            chips_analysis_action.log
 
-          cat chips_summary.log
-
-      - name: Show changed files
-        run: |
-          git status --short
-
-      - name: Commit chip static CSV
+      - name: Commit chip static file
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add "${STATIC_CHIP_OUTPUT_FILE}"
-
-          if git diff --cached --quiet; then
-            echo "No chip static changes to commit."
-            exit 0
-          fi
-
-          git commit -m "Update chip static CSV"
-
-      - name: Clean uncommitted runtime files
-        run: |
-          git reset -- .
-          git restore --worktree .
-          git clean -fd
-          git status --short
-
-      - name: Push changes
-        run: |
-          git push origin HEAD:"${GITHUB_REF_NAME}"
-
-      - name: Upload chips logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: chips-summary
-          path: |
-            chips_summary.log
-            /tmp/chips_action.log
-            /tmp/finmind_token_usage_log.csv
-          if-no-files-found: ignore
+          git add "${STATIC_CHIP_OUTPUT_FILE}" chips_analysis_action.log
+          git diff --cached --quiet || git commit -m "Update ${STATIC_CHIP_OUTPUT_FILE}"
+          git push
