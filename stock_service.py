@@ -14,8 +14,11 @@ from technical_indicators import add_indicators, get_kd_trend, get_bb_trend, get
 
 
 STATIC_CSV_PATH = os.getenv("STATIC_CSV_FILE", "AllStatic.csv")
+STATIC_CHIPS_CSV_PATH = os.getenv("STATIC_CHIPS_FILE", "Static_Chips.csv")
 _STATIC_MAP_CACHE = None
 _STATIC_MAP_MTIME = None
+_CHIPS_STATIC_MAP_CACHE = None
+_CHIPS_STATIC_MAP_MTIME = None
 
 
 def get_price_60d_high_low(df):
@@ -73,6 +76,42 @@ def load_static_map(static_csv_path=STATIC_CSV_PATH, force_reload=False):
         return {}
 
 
+def load_chips_static_map(static_chips_csv_path=STATIC_CHIPS_CSV_PATH, force_reload=False):
+    global _CHIPS_STATIC_MAP_CACHE, _CHIPS_STATIC_MAP_MTIME
+
+    try:
+        if not os.path.exists(static_chips_csv_path):
+            print(f"⚠️ 找不到籌碼靜態資料檔: {static_chips_csv_path}")
+            return {}
+
+        mtime = os.path.getmtime(static_chips_csv_path)
+        if (not force_reload) and _CHIPS_STATIC_MAP_CACHE is not None and _CHIPS_STATIC_MAP_MTIME == mtime:
+            return _CHIPS_STATIC_MAP_CACHE
+
+        df = pd.read_csv(static_chips_csv_path, encoding="utf-8-sig", dtype={"stock_id": str})
+        df.columns = df.columns.str.strip()
+
+        if "stock_id" not in df.columns:
+            print(f"⚠️ Static_Chips.csv 缺少 stock_id 欄位: {static_chips_csv_path}")
+            return {}
+
+        df = df.where(pd.notna(df), None)
+
+        chips_map = {}
+        for _, row in df.iterrows():
+            stock_id = str(row["stock_id"]).strip()
+            chips_map[stock_id] = row.to_dict()
+
+        _CHIPS_STATIC_MAP_CACHE = chips_map
+        _CHIPS_STATIC_MAP_MTIME = mtime
+        print(f"✅ 已載入籌碼靜態資料: {static_chips_csv_path}, 筆數={len(chips_map)}")
+        return chips_map
+
+    except Exception as e:
+        print(f"❌ 讀取 Static_Chips.csv 失敗: {e}")
+        return {}
+
+
 def to_float_or_none(v):
     if v is None:
         return None
@@ -113,7 +152,7 @@ def to_str_or_none(v):
     return text if text and text.lower() not in {"nan", "none", "null"} else None
 
 
-def process_stock(s, static_map=None):
+def process_stock(s, static_map=None, chips_map=None):
     stock_id = str(s["stock_id"])
     name = s["name"]
 
@@ -133,6 +172,7 @@ def process_stock(s, static_map=None):
     }
 
     static_row = (static_map or {}).get(stock_id, {})
+    chip_row = (chips_map or {}).get(stock_id, {})
 
     try:
         df = get_stock_data(stock_id)
@@ -145,6 +185,7 @@ def process_stock(s, static_map=None):
                 "reason": "get_stock_data 回傳 None",
             })
             x.update(_build_static_fields(static_row))
+            x.update(_build_chip_fields(chip_row))
             return x
 
         if df.empty:
@@ -155,6 +196,7 @@ def process_stock(s, static_map=None):
                 "reason": "股價資料為空",
             })
             x.update(_build_static_fields(static_row))
+            x.update(_build_chip_fields(chip_row))
             return x
 
         if len(df) < 60:
@@ -165,6 +207,7 @@ def process_stock(s, static_map=None):
                 "reason": f"歷史資料不足60日，僅有 {len(df)} 筆",
             })
             x.update(_build_static_fields(static_row))
+            x.update(_build_chip_fields(chip_row))
             return x
 
         df = add_indicators(df)
@@ -273,6 +316,10 @@ def process_stock(s, static_map=None):
         bias50_max = safe_ma_stats.get(
             "bias50_60d_high") or safe_ma_stats.get("bias50_max")
 
+        static_fields = _build_static_fields(static_row)
+        chip_fields = _build_chip_fields(chip_row)
+        merged_static_fields = {**static_fields, **chip_fields}
+
         try:
             signal_res = get_tech_signal(
                 close=close,
@@ -306,6 +353,14 @@ def process_stock(s, static_map=None):
                 prev_ma50=prev_ma50,
                 macd_hist=macd_hist,
                 prev_macd_hist=prev_macd_hist,
+                chip_signal_state=merged_static_fields.get("chip_signal_state"),
+                chip_signal_text=merged_static_fields.get("chip_signal_text"),
+                chip_concentration_score=merged_static_fields.get("chip_concentration_score"),
+                main_force_score=merged_static_fields.get("main_force_score"),
+                broker_diff_score=merged_static_fields.get("broker_diff_score"),
+                chip_concentration_pct=merged_static_fields.get("chip_concentration_pct"),
+                chip_trend_days=merged_static_fields.get("chip_trend_days"),
+                chip_concentration_threshold=merged_static_fields.get("chip_concentration_threshold"),
             ) or {"signal": "等待觀察", "reason": "", "signal_text": "等待觀察"}
         except Exception as e:
             print(f"❌ signal error {stock_id}: {e}")
@@ -334,8 +389,6 @@ def process_stock(s, static_map=None):
             entry_note = "抄底"
         elif signal == "買進" and ma18_break and chgPct >= 3:
             entry_note = "追漲"
-
-        static_fields = _build_static_fields(static_row)
 
         margin_score = calc_margin_score(
             static_fields.get("gross_margin"),
@@ -379,6 +432,7 @@ def process_stock(s, static_map=None):
             "amp": float(amp),
 
             **static_fields,
+            **chip_fields,
 
             "dividend": float(dividend) if dividend is not None else None,
             "yield_value": float(yield_value) if yield_value is not None and not pd.isna(yield_value) else None,
@@ -439,6 +493,7 @@ def process_stock(s, static_map=None):
         print(f"❌ process error {stock_id}: {e}")
         x = base.copy()
         x.update(_build_static_fields(static_row))
+        x.update(_build_chip_fields(chip_row))
         x.update({
             "signal": "資料異常",
             "signal_text": "資料異常",
@@ -484,14 +539,34 @@ def _build_static_fields(static_row):
     }
 
 
-def get_full_stock_analysis(stock_list, static_map=None):
+def _build_chip_fields(chip_row):
+    return {
+        "chip_trend_days": to_int_or_none(chip_row.get("chip_trend_days")),
+        "chip_concentration_threshold": to_float_or_none(chip_row.get("chip_concentration_threshold")),
+        "chip_concentration_pct": to_float_or_none(chip_row.get("chip_concentration_pct")),
+        "chip_concentration_score": to_float_or_none(chip_row.get("chip_concentration_score")),
+        "main_force_net": to_int_or_none(chip_row.get("main_force_net")),
+        "main_force_score": to_float_or_none(chip_row.get("main_force_score")),
+        "broker_diff": to_int_or_none(chip_row.get("broker_diff")),
+        "broker_diff_score": to_float_or_none(chip_row.get("broker_diff_score")),
+        "chip_signal_state": to_str_or_none(chip_row.get("chip_signal_state")),
+        "chip_signal_text": to_str_or_none(chip_row.get("chip_signal_text")),
+        "chips_status": to_str_or_none(chip_row.get("chips_status")),
+        "chips_reason": to_str_or_none(chip_row.get("chips_reason")),
+        "chips_updated_at": to_str_or_none(chip_row.get("chips_updated_at")),
+    }
+
+
+def get_full_stock_analysis(stock_list, static_map=None, chips_map=None):
     results = []
     if static_map is None:
         static_map = load_static_map()
+    if chips_map is None:
+        chips_map = load_chips_static_map()
 
     for i, s in enumerate(stock_list, 1):
         #   print(f"處理中 {i}/{len(stock_list)}: {s}")
-        data = process_stock(s, static_map=static_map)
+        data = process_stock(s, static_map=static_map, chips_map=chips_map)
         results.append(data)
 
         if data.get("signal") in ("無資料", "資料不足", "資料異常"):

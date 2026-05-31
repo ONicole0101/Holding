@@ -390,8 +390,10 @@ def get_profit_ratio(stock_id):
             'start_date': '2020-01-01',
             'token': FINMIND_token,
         }
-        _record_finmind_request("profit source", stock_id, "TaiwanStockFinancialStatements")
-        res = requests.get(API_URL, params=params, headers=headers, timeout=300)
+        _record_finmind_request("profit source", stock_id,
+                                "TaiwanStockFinancialStatements")
+        res = requests.get(API_URL, params=params,
+                           headers=headers, timeout=300)
         data = _safe_response_json(res)
         _print_initial_quota_once(data, res)
 
@@ -504,7 +506,8 @@ def get_per_pbr_60d_stats(stock_id, days=60):
             "token": FINMIND_token,
         }
         _record_finmind_request("PER/PBR 60D", stock_id, "TaiwanStockPER")
-        res = requests.get(API_URL, params=params, headers=headers, timeout=300)
+        res = requests.get(API_URL, params=params,
+                           headers=headers, timeout=300)
         res_data = _safe_response_json(res)
         _print_initial_quota_once(res_data, res)
 
@@ -530,8 +533,10 @@ def get_per_pbr_60d_stats(stock_id, days=60):
         if df_win.empty:
             df_win = df.copy()
 
-        per_col = next((c for c in ["price_earning_ratio", "PER", "per"] if c in df_win.columns), None)
-        pbr_col = next((c for c in ["price_book_ratio", "PBR", "pbr"] if c in df_win.columns), None)
+        per_col = next(
+            (c for c in ["price_earning_ratio", "PER", "per"] if c in df_win.columns), None)
+        pbr_col = next(
+            (c for c in ["price_book_ratio", "PBR", "pbr"] if c in df_win.columns), None)
 
         def latest_valid(col):
             if not col:
@@ -541,7 +546,8 @@ def get_per_pbr_60d_stats(stock_id, days=60):
             if valid.empty:
                 return None, None, False
             latest_valid_date = valid["date"].max()
-            latest_value = valid.loc[valid["date"] == latest_valid_date, col].iloc[-1]
+            latest_value = valid.loc[valid["date"]
+                                     == latest_valid_date, col].iloc[-1]
             return safe_round(latest_value), latest_valid_date, bool(latest_valid_date < latest_row_date)
 
         per, per_date, per_is_prev = latest_valid(per_col)
@@ -575,6 +581,246 @@ def get_per_pbr_60d_stats(stock_id, days=60):
         print(f"❌ PER/PBR 60D error {stock_id}: {e}")
         return empty
 
+
+def _env_int(name, default, min_value=None, max_value=None):
+    """Read an integer environment value with safe fallback."""
+    try:
+        value = int(str(os.getenv(name, default)).strip())
+    except Exception:
+        value = int(default)
+    if min_value is not None:
+        value = max(value, int(min_value))
+    if max_value is not None:
+        value = min(value, int(max_value))
+    return value
+
+
+def _env_float(name, default, min_value=None, max_value=None):
+    """Read a float environment value with safe fallback."""
+    try:
+        value = float(str(os.getenv(name, default)).strip())
+    except Exception:
+        value = float(default)
+    if min_value is not None:
+        value = max(value, float(min_value))
+    if max_value is not None:
+        value = min(value, float(max_value))
+    return value
+
+
+def get_chip_config(trend_days=None, concentration_threshold=None):
+    """
+    籌碼判斷參數。
+
+    可由環境參數設定預設值，也可由呼叫端/UI 傳入覆寫：
+    - CHIP_TREND_DAYS：連續判斷天數，預設 3
+    - CHIP_CONCENTRATION_THRESHOLD：籌碼集中度門檻百分比，預設 15
+    """
+    days = trend_days if trend_days is not None else _env_int(
+        "CHIP_TREND_DAYS", 3, min_value=1, max_value=20
+    )
+    threshold = concentration_threshold if concentration_threshold is not None else _env_float(
+        "CHIP_CONCENTRATION_THRESHOLD", 15, min_value=0, max_value=100
+    )
+    try:
+        days = max(1, min(int(days), 20))
+    except Exception:
+        days = 3
+    try:
+        threshold = max(0.0, min(float(threshold), 100.0))
+    except Exception:
+        threshold = 15.0
+    return days, threshold
+
+
+def _score_by_ratio(ratio):
+    """Convert a -1..1 ratio into the same arrow score style used by KD/BB."""
+    if ratio >= 0.999:
+        return 1
+    if ratio > 0:
+        return 0.5
+    if ratio <= -0.999:
+        return -1
+    if ratio < 0:
+        return -0.5
+    return 0
+
+
+def get_chip_analysis(stock_id, trend_days=None, concentration_threshold=None):
+    """
+    取得近 N 個交易日券商分點籌碼，輸出給 AllStatic/template/signals 使用。
+
+    回傳欄位重點：
+    - chip_concentration_score：籌碼集中趨勢箭頭分數（可直接給前端 fmtTrend）
+    - main_force_score：主力買賣超 N 天趨勢箭頭分數
+    - broker_diff_score：買賣家數差 N 天趨勢箭頭分數
+    - chip_signal_state：bullish_concentrated / bullish_distributed /
+      bearish_distributed / neutral
+    """
+    days, threshold = get_chip_config(trend_days, concentration_threshold)
+    empty = {
+        "chip_trend_days": days,
+        "chip_concentration_threshold": threshold,
+        "chip_concentration_pct": None,
+        "chip_concentration_score": None,
+        "main_force_net": None,
+        "main_force_score": None,
+        "broker_diff": None,
+        "broker_diff_score": None,
+        "chip_signal_state": "no_data",
+        "chip_signal_text": "籌碼資料不足",
+    }
+
+    try:
+        start_date = datetime.today().date() - timedelta(days=max(days * 7, 21))
+        end_date = datetime.today().date()
+        daily = []
+        current_date = start_date
+        while current_date <= end_date:
+            date_str = current_date.strftime("%Y-%m-%d")
+            params = {
+                "dataset": "TaiwanStockTradingDailyReport",
+                "data_id": str(stock_id),
+                "start_date": date_str,
+                "token": FINMIND_token,
+            }
+            print(
+                f"🔎 chip analysis request: dataset={params['dataset']} stock_id={stock_id} date={date_str} token_present={bool(FINMIND_token)}")
+            _record_finmind_request(
+                "chip analysis", stock_id, "TaiwanStockTradingDailyReport")
+            res = requests.get(API_URL, params=params,
+                               headers=headers, timeout=300)
+            print(f"🔄 chip analysis response status: {res.status_code}")
+            res_data = _safe_response_json(res)
+            _print_initial_quota_once(res_data, res)
+
+            if res.status_code != 200:
+                _print_api_status_error(
+                    "chip analysis", stock_id, res, res_data)
+                if res.status_code == 422:
+                    try:
+                        js = res.json()
+                        if js:
+                            print(f"🔍 FinMind 422 detail: {js}")
+                    except Exception:
+                        pass
+                return empty
+
+            data = res_data.get("data", [])
+            if data:
+                df = pd.DataFrame(data)
+                broker_column = None
+                if "broker" in df.columns:
+                    broker_column = "broker"
+                elif "securities_trader" in df.columns:
+                    broker_column = "securities_trader"
+                elif "securities_trader_id" in df.columns:
+                    broker_column = "securities_trader_id"
+
+                required = {"date", "stock_id", "buy", "sell"}
+                if broker_column:
+                    required.add(broker_column)
+
+                if not required.issubset(df.columns):
+                    print(
+                        f"⚠️ chip analysis missing cols {stock_id} on {date_str}: cols={list(df.columns)}")
+                    current_date += timedelta(days=1)
+                    continue
+
+                if broker_column is None:
+                    print(
+                        f"⚠️ chip analysis no broker-like column found for {stock_id} on {date_str}: cols={list(df.columns)}")
+                    current_date += timedelta(days=1)
+                    continue
+
+                df = df[df["stock_id"].astype(str) == str(stock_id)]
+                if df.empty:
+                    print(
+                        f"⚠️ chip analysis no rows for {stock_id} on {date_str}")
+                    current_date += timedelta(days=1)
+                    continue
+
+                df["date"] = pd.to_datetime(df["date"], errors="coerce")
+                df["buy"] = pd.to_numeric(df["buy"], errors="coerce").fillna(0)
+                df["sell"] = pd.to_numeric(
+                    df["sell"], errors="coerce").fillna(0)
+                df = df.dropna(subset=["date"])
+                if not df.empty:
+                    df["net_buy"] = df["buy"] - df["sell"]
+                    active_buyers = df.loc[df["buy"]
+                                           > 0, broker_column].nunique()
+                    active_sellers = df.loc[df["sell"]
+                                            > 0, broker_column].nunique()
+                    broker_diff = int(active_buyers - active_sellers)
+
+                    sorted_group = df.sort_values("net_buy", ascending=False)
+                    top_buy = sorted_group.head(15)["net_buy"].sum()
+                    top_sell = sorted_group.tail(15)["net_buy"].sum()
+                    main_force_net = float(top_buy + top_sell)
+                    total_turnover = float((df["buy"] + df["sell"]).sum())
+                    concentration_pct = (
+                        abs(main_force_net) / total_turnover * 100) if total_turnover else None
+
+                    daily.append({
+                        "date": current_date,
+                        "main_force_net": main_force_net,
+                        "broker_diff": broker_diff,
+                        "chip_concentration_pct": concentration_pct,
+                    })
+
+            current_date += timedelta(days=1)
+
+        report = pd.DataFrame(daily).sort_values(
+            "date", ascending=False).head(days)
+        if report.empty:
+            return empty
+
+        main_pos = int((report["main_force_net"] > 0).sum())
+        main_neg = int((report["main_force_net"] < 0).sum())
+        diff_pos = int((report["broker_diff"] > 0).sum())
+        diff_neg = int((report["broker_diff"] < 0).sum())
+        conc_ok = report["chip_concentration_pct"].fillna(0) >= threshold
+        conc_pos = int(((report["main_force_net"] > 0) & conc_ok).sum())
+        conc_neg = int(((report["main_force_net"] < 0) & conc_ok).sum())
+
+        main_score = _score_by_ratio((main_pos - main_neg) / len(report))
+        broker_score = _score_by_ratio((diff_pos - diff_neg) / len(report))
+        concentration_score = _score_by_ratio(
+            (conc_pos - conc_neg) / len(report))
+
+        latest = report.iloc[0]
+        state = "neutral"
+        text = "籌碼震盪，方向未定"
+        if main_pos == len(report) and diff_neg == len(report) and conc_pos >= 1:
+            state = "bullish_concentrated"
+            text = f"主力連{days}買、買賣家數差連{days}負，籌碼偏集中"
+        elif main_pos == len(report) and diff_pos >= 1:
+            state = "bullish_distributed"
+            text = f"主力連{days}買但買賣家數差偏正，可能偏分散"
+        elif main_neg == len(report) and diff_pos == len(report):
+            state = "bearish_distributed"
+            text = f"主力連{days}賣、買賣家數差連{days}正，籌碼流向散戶風險高"
+        elif main_neg == len(report):
+            state = "bearish"
+            text = f"主力連{days}賣，籌碼偏弱"
+
+        return {
+            "chip_trend_days": days,
+            "chip_concentration_threshold": threshold,
+            "chip_concentration_pct": round(float(latest["chip_concentration_pct"]), 2) if pd.notna(latest["chip_concentration_pct"]) else None,
+            "chip_concentration_score": concentration_score,
+            "main_force_net": int(round(float(latest["main_force_net"]))),
+            "main_force_score": main_score,
+            "broker_diff": int(latest["broker_diff"]),
+            "broker_diff_score": broker_score,
+            "chip_signal_state": state,
+            "chip_signal_text": text,
+        }
+    except Exception as e:
+        print(f"❌ chip analysis error {stock_id}: {e}")
+        return empty
+
+
 def get_disposition_securities_period(stock_id):
     """
     Return active disposition period for one stock from FinMind
@@ -606,12 +852,14 @@ def get_disposition_securities_period(stock_id):
             stock_id,
             "TaiwanStockDispositionSecuritiesPeriod",
         )
-        res = requests.get(API_URL, params=params, headers=headers, timeout=300)
+        res = requests.get(API_URL, params=params,
+                           headers=headers, timeout=300)
         res_data = _safe_response_json(res)
         _print_initial_quota_once(res_data, res)
 
         if res.status_code != 200:
-            _print_api_status_error("disposition period", stock_id, res, res_data)
+            _print_api_status_error(
+                "disposition period", stock_id, res, res_data)
             return empty
 
         data = res_data.get("data", [])
@@ -625,8 +873,10 @@ def get_disposition_securities_period(stock_id):
             )
             return empty
 
-        df["period_start"] = pd.to_datetime(df["period_start"], errors="coerce").dt.date
-        df["period_end"] = pd.to_datetime(df["period_end"], errors="coerce").dt.date
+        df["period_start"] = pd.to_datetime(
+            df["period_start"], errors="coerce").dt.date
+        df["period_end"] = pd.to_datetime(
+            df["period_end"], errors="coerce").dt.date
         df = df.dropna(subset=["period_start", "period_end"])
         if df.empty:
             return empty
@@ -635,7 +885,8 @@ def get_disposition_securities_period(stock_id):
             ((df["period_start"] <= today) & (today <= df["period_end"]))
             | ((df["period_start"] <= tomorrow) & (tomorrow <= df["period_end"]))
         )
-        active = df.loc[mask].sort_values(["period_end", "period_start"], ascending=[False, False])
+        active = df.loc[mask].sort_values(
+            ["period_end", "period_start"], ascending=[False, False])
         if active.empty:
             return empty
 
@@ -651,4 +902,3 @@ def get_disposition_securities_period(stock_id):
     except Exception as e:
         print(f"❌ disposition period error {stock_id}: {e}")
         return empty
-

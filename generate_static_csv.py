@@ -636,8 +636,18 @@ def build_incremental(stock_list, output_file, max_rows=None, min_remain=None, r
     print(f"Updated this run: {processed}", flush=True)
     print(f"AllStatic full rebuild: {status_counts}, total={len(final_df)}", flush=True)
 
-def load_stock_list():
-    csv_file = config.CSV_FILE
+def resolve_config_value(env_name, config_name, default=None):
+    value = os.getenv(env_name)
+    if value is not None and str(value).strip() != "":
+        return str(value).strip()
+    value = getattr(config, config_name, default)
+    if value is None:
+        return default
+    return str(value).strip()
+
+
+def load_stock_list(csv_file=None):
+    csv_file = csv_file or resolve_config_value("CSV_FILE", "CSV_FILE", "stocks.csv")
     src_df = pd.read_csv(csv_file, sep="\t", encoding="utf-8-sig", dtype=str)
     src_df.columns = src_df.columns.str.strip()
     src_df = src_df.rename(columns={"Ticker": "stock_id", "Name": "name"})
@@ -648,8 +658,7 @@ def load_stock_list():
 def main():
     parser = argparse.ArgumentParser(
         description="Full rebuild AllStatic.csv every run.")
-    parser.add_argument("--output", default=getattr(config,
-                        "STATIC_OUTPUT_FILE", "AllStatic.csv"))
+    parser.add_argument("--output", default=resolve_config_value("STATIC_OUTPUT_FILE", "STATIC_OUTPUT_FILE", "AllStatic.csv"))
     parser.add_argument("--max-rows", type=int, default=None,
                         help="Ignored in full rebuild mode; kept for workflow compatibility.")
     parser.add_argument("--min-remain", type=int, default=0,

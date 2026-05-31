@@ -190,6 +190,14 @@ def get_tech_signal(
     prev_ma50=None,
     macd_hist=None,
     prev_macd_hist=None,
+    chip_signal_state=None,
+    chip_signal_text=None,
+    chip_concentration_score=None,
+    main_force_score=None,
+    broker_diff_score=None,
+    chip_concentration_pct=None,
+    chip_trend_days=None,
+    chip_concentration_threshold=None,
 ):
     """
     技術訊號主邏輯。
@@ -219,6 +227,15 @@ def get_tech_signal(
     prev_close = _num(prev_close)
     macd_hist = _num(macd_hist)
     prev_macd_hist = _num(prev_macd_hist)
+    chip_concentration_score = _num(chip_concentration_score)
+    main_force_score = _num(main_force_score)
+    broker_diff_score = _num(broker_diff_score)
+    chip_concentration_pct = _num(chip_concentration_pct)
+    try:
+        chip_trend_days = int(chip_trend_days) if chip_trend_days is not None else None
+    except Exception:
+        chip_trend_days = None
+    chip_concentration_threshold = _num(chip_concentration_threshold)
 
     if close is None:
         return {
@@ -389,6 +406,45 @@ def get_tech_signal(
     if volume_shrink:
         reasons.append('明顯量縮')
 
+    # === 籌碼判斷 ===
+    chip_state = str(chip_signal_state or '').strip()
+    chip_days_text = f"{chip_trend_days}天" if chip_trend_days else "多日"
+    chip_threshold_text = (
+        f"、集中度門檻{chip_concentration_threshold:g}%"
+        if chip_concentration_threshold is not None else ""
+    )
+
+    chip_bullish_concentrated = chip_state == 'bullish_concentrated'
+    chip_bullish_distributed = chip_state == 'bullish_distributed'
+    chip_bearish_distributed = chip_state == 'bearish_distributed'
+    chip_bearish = chip_state in ('bearish', 'bearish_distributed')
+
+    if chip_signal_text:
+        reasons.append(str(chip_signal_text))
+    elif chip_bullish_concentrated:
+        reasons.append(f'籌碼{chip_days_text}集中偏多{chip_threshold_text}')
+    elif chip_bullish_distributed:
+        reasons.append(f'主力{chip_days_text}買超但籌碼偏分散')
+    elif chip_bearish_distributed:
+        reasons.append(f'主力{chip_days_text}賣超且籌碼流向散戶')
+    elif chip_bearish:
+        reasons.append(f'主力{chip_days_text}賣超')
+
+    if chip_concentration_score is not None and chip_concentration_score > 0:
+        reasons.append('籌碼集中趨勢轉強')
+    elif chip_concentration_score is not None and chip_concentration_score < 0:
+        reasons.append('籌碼集中趨勢轉弱')
+
+    if main_force_score is not None and main_force_score > 0:
+        reasons.append('主力買超趨勢偏多')
+    elif main_force_score is not None and main_force_score < 0:
+        reasons.append('主力買超趨勢偏空')
+
+    if broker_diff_score is not None and broker_diff_score < 0:
+        reasons.append('買賣家數差收斂')
+    elif broker_diff_score is not None and broker_diff_score > 0:
+        reasons.append('買賣家數差擴散')
+
     # === 位階判斷 ===
     zone_info = _calc_position_zone(
         close=close,
@@ -441,6 +497,44 @@ def get_tech_signal(
     # ============================================================
     # 規則判斷：位階 × 價量 × 技術確認
     # ============================================================
+
+    # 0) 籌碼優先警示：主力賣、家數擴散，若股價走弱或放量下跌，風險優先。
+    if (
+        chip_bearish_distributed
+        and (price_down or price_volume_state in ('價跌量增', '價平量增'))
+        and (kd_weak or trend_break_confirmed or position_zone in ('頂部區域', '下跌途中'))
+    ):
+        return {
+            'signal': '賣出',
+            'reason': '主力連續賣超且買賣家數差擴散，搭配股價轉弱，籌碼流向散戶風險高',
+            'signal_text': _join_reasons(reasons),
+        }
+
+    # 0-1) 主力連買但家數擴散：虛胖型上漲，不追高。
+    if (
+        chip_bullish_distributed
+        and price_up
+        and (bb_high or bias_high_zone or volume_spike)
+    ):
+        return {
+            'signal': '觀察再賣出' if position_zone == '頂部區域' else '等待觀察',
+            'reason': '雖有主力買超，但買賣家數差擴散，屬偏分散的虛胖型上漲，避免追高',
+            'signal_text': _join_reasons(reasons),
+        }
+
+    # 0-2) 籌碼集中偏多：低調吸籌或起漲初期，給偏多觀察/買進。
+    if (
+        chip_bullish_concentrated
+        and not overheat_confirmed
+        and not trend_break_confirmed
+        and price_volume_state in ('價漲量增', '價平量增', '價量中性', '價漲量縮')
+        and (kd_strong or trend_supported or position_zone in ('底部區域', '上漲途中', '盤整區域'))
+    ):
+        return {
+            'signal': '買進' if price_volume_state == '價漲量增' and (above_ma18 or ma18_break) else '觀察再買進',
+            'reason': '主力買超且買賣家數差收斂，籌碼集中偏多，可跟隨低佈局但避免追高',
+            'signal_text': _join_reasons(reasons),
+        }
 
     # 1) 起漲保護：聯發科 2454 類型，剛站回月線 + 價量/KD轉強，不因短線高檔或剛獲利而賣。
     if early_uptrend:

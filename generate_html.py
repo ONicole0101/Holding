@@ -20,6 +20,13 @@ TECH_COLUMNS = [
 ]
 
 
+def cfg(name, default=None):
+    value = os.getenv(name)
+    if value not in (None, ""):
+        return value
+    return getattr(config, name, default)
+
+
 def enrich_html_fields(results):
     """補上 HTML 可直接顯示的技術摘要欄位。
 
@@ -57,9 +64,17 @@ def get_finmind_usage():
 
 
 def get_static_csv_path():
-    config_path = getattr(config, "STATIC_OUTPUT_FILE", None)
-    env_path = os.getenv("STATIC_CSV_FILE")
-    return env_path or config_path or "AllStatic.csv"
+    return os.getenv("STATIC_CSV_FILE") or cfg("STATIC_OUTPUT_FILE") or cfg("STATIC_CSV_FILE") or "AllStatic.csv"
+
+
+def get_chip_static_csv_path():
+    return (
+        os.getenv("STATIC_CHIP_FILE")
+        or os.getenv("STATIC_CHIPS_FILE")
+        or cfg("STATIC_CHIP_OUTPUT_FILE")
+        or cfg("STATIC_CHIPS_OUTPUT_FILE")
+        or "AllStatic_Chip.csv"
+    )
 
 
 def format_output(results):
@@ -107,13 +122,16 @@ def build_strings(data):
 
 def main():
     try:
-        report_type = config.REPORT_TYPE
-        csv_file = config.CSV_FILE
-        report_title = config.REPORT_TITLE
-        output_file = config.OUTPUT_FILE
+        report_type = cfg("REPORT_TYPE", "持股")
+        csv_file = cfg("CSV_FILE", "stocks.csv")
+        report_title = cfg("REPORT_TITLE", "技術分析報告")
+        output_file = cfg("OUTPUT_FILE", "report")
         static_csv_file = get_static_csv_path()
+        chip_static_csv_file = get_chip_static_csv_path()
 
         df = pd.read_csv(csv_file, sep="\t", encoding="utf-8-sig", dtype=str)
+        if len(df.columns) == 1:
+            df = pd.read_csv(csv_file, encoding="utf-8-sig", dtype=str)
         df.columns = df.columns.str.strip()
         stock_list = df.rename(
             columns={"Ticker": "stock_id", "Name": "name"}
@@ -128,9 +146,17 @@ def main():
         print("請先執行 generate_static_csv.py 產生 AllStatic.csv")
         return
 
+    if not os.path.exists(chip_static_csv_file):
+        print(f"❌ 找不到籌碼靜態資料檔：{chip_static_csv_file}")
+        print("請先執行 chips_analysis.py 產生 AllStatic_Chip.csv")
+        return
+
     # 讓 stock_service.py 能讀到同一路徑
     os.environ["STATIC_CSV_FILE"] = static_csv_file
+    os.environ["STATIC_CHIP_FILE"] = chip_static_csv_file
+    os.environ["STATIC_CHIPS_FILE"] = chip_static_csv_file
     print(f"📄 使用靜態資料檔：{static_csv_file}")
+    print(f"📄 使用籌碼靜態資料檔：{chip_static_csv_file}")
 
     start_used = start_limit = start_remain = None
 
@@ -171,9 +197,12 @@ def main():
         else:
             file_url = f"https://github.com/{user}/{repo}/blob/{branch}/{filename}"
 
-        if report_type == "Holding":
+        custom_subtitle = cfg("REPORT_SUBTITLE", "")
+        if custom_subtitle:
+            report_subtitle = custom_subtitle
+        elif report_type in ("Holding", "持股"):
             report_subtitle = "持股追蹤與風險檢視"
-        elif report_type == "Gold":
+        elif report_type in ("Gold", "黃金", "黃金股"):
             report_subtitle = "潛力黃金股觀察名單"
         else:
             report_subtitle = "台股技術分析"
