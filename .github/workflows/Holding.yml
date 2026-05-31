@@ -1,4 +1,4 @@
-name: Report
+name: 產出Report
 
 on:
   workflow_dispatch:
