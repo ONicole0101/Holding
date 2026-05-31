@@ -1,4 +1,4 @@
-name: Chip Analysis
+name: Update Static_Chips CSV
 
 on:
   workflow_dispatch:
