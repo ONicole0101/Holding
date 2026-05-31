@@ -1,8 +1,8 @@
-[32m2026-05-31 10:58:24.349[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
-[32m2026-05-31 10:58:24.517[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
+[32m2026-05-31 13:01:12.243[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
+[32m2026-05-31 13:01:12.356[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
 Chip static config: csv_file=stocks.csv, output=AllStatic_Chips.csv, trend_days=3, threshold=15.0, lookback_days=21, workers=6, sleep_sec=0.05
 FinMind token: token_present=True, source=FINMIND_TOKEN, token=eyJ0...E3S4, login=ok
-FinMind usage: 2207/6000, remain=3793
+FinMind usage: 282/6000, remain=5718
 Processing chips 1/20: 2313 華通
 🔎 chip analysis request: dataset=TaiwanStockTradingDailyReport stock_id=2313 date=2026-05-10 token_present=True
 🔄 chip analysis response status: 200
