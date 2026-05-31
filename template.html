@@ -484,7 +484,9 @@
 <body>
   <div class="container">
     <h2>{{report_title}}</h2>
+    {% if report_subtitle %}
     <p>{{ report_subtitle }}</p>
+    {% endif %}
     <p>產生時間：{{ generated_time }}</p>
 
     <div class="tabs" id="tabs">

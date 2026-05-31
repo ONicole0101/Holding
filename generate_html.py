@@ -45,7 +45,8 @@ def enrich_html_fields(results):
                 parts.append(str(val))
         if x.get("macd_hist") is not None:
             parts.append(f"MACD柱 {x.get('macd_hist')}")
-        x["tech_summary"] = " / ".join(parts) if parts else x.get("signal_text", "")
+        x["tech_summary"] = " / ".join(
+            parts) if parts else x.get("signal_text", "")
         out.append(x)
     return out
 
@@ -198,14 +199,6 @@ def main():
             file_url = f"https://github.com/{user}/{repo}/blob/{branch}/{filename}"
 
         custom_subtitle = cfg("REPORT_SUBTITLE", "")
-        if custom_subtitle:
-            report_subtitle = custom_subtitle
-        elif report_type in ("Holding", "持股"):
-            report_subtitle = "持股追蹤與風險檢視"
-        elif report_type in ("Gold", "黃金", "黃金股"):
-            report_subtitle = "潛力黃金股觀察名單"
-        else:
-            report_subtitle = "台股技術分析"
 
         try:
             with open("template.html", "r", encoding="utf-8") as f:
