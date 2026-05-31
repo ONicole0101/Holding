@@ -1,0 +1,30 @@
+name: Chip Analysis
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run-chip-analysis:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run chips analysis
+        env:
+          FINMIND_TOKEN: ${{ secrets.FINMIND_TOKEN }}
+          CHIP_TREND_DAYS: 3
+          CHIP_CONCENTRATION_THRESHOLD: 15
+        run: |
+          python chips_analysis.py
