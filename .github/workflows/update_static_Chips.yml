@@ -1,5 +1,4 @@
-name: Update AllStatic_Chips CSV
-
+name: Update Static_Chips CSV
 on:
   workflow_dispatch:
     inputs:
@@ -10,11 +9,11 @@ on:
       output_file:
         description: Chip static output file
         required: false
-        default: "AllStatic_Chips.csv"
+        default: "AllStatic_Chip.csv"
       workers:
-        description: Parallel stock workers
+        description: Parallel day requests per stock
         required: false
-        default: "4"
+        default: "6"
 
 permissions:
   contents: write
@@ -29,27 +28,20 @@ env:
   REPORT_TITLE: ${{ vars.REPORT_TITLE || '(持股)技術分析報告' }}
   OUTPUT_FILE: ${{ vars.OUTPUT_FILE || '持股' }}
   STATIC_OUTPUT_FILE: ${{ vars.STATIC_OUTPUT_FILE || 'AllStatic.csv' }}
-  STATIC_CHIP_OUTPUT_FILE: ${{ github.event.inputs.output_file || vars.STATIC_CHIP_OUTPUT_FILE || 'AllStatic_Chips.csv' }}
+  STATIC_CHIP_OUTPUT_FILE: ${{ github.event.inputs.output_file || vars.STATIC_CHIP_OUTPUT_FILE || 'AllStatic_Chip.csv' }}
   CHIP_TREND_DAYS: ${{ vars.CHIP_TREND_DAYS || '3' }}
   CHIP_CONCENTRATION_THRESHOLD: ${{ vars.CHIP_CONCENTRATION_THRESHOLD || '15' }}
   CHIP_LOOKBACK_DAYS: ${{ vars.CHIP_LOOKBACK_DAYS || '21' }}
-  CHIP_WORKERS: ${{ github.event.inputs.workers || vars.CHIP_WORKERS || '4' }}
-  CHIP_SLEEP_SEC: ${{ vars.CHIP_SLEEP_SEC || '0' }}
-  CHIP_LOG_EVERY: ${{ vars.CHIP_LOG_EVERY || '10' }}
-  CHIP_VERBOSE: ${{ vars.CHIP_VERBOSE || '0' }}
-  FINMIND_USAGE_LOG_FILE: /tmp/finmind_token_usage_log.csv
+  CHIP_WORKERS: ${{ github.event.inputs.workers || vars.CHIP_WORKERS || '6' }}
+  CHIP_SLEEP_SEC: ${{ vars.CHIP_SLEEP_SEC || '0.05' }}
 
 jobs:
   run-chip-analysis:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          clean: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -67,14 +59,16 @@ jobs:
 
       - name: Show runtime config
         run: |
-          echo "CSV_FILE=${CSV_FILE}"
-          echo "STATIC_CHIP_OUTPUT_FILE=${STATIC_CHIP_OUTPUT_FILE}"
-          echo "CHIP_TREND_DAYS=${CHIP_TREND_DAYS}"
-          echo "CHIP_CONCENTRATION_THRESHOLD=${CHIP_CONCENTRATION_THRESHOLD}"
-          echo "CHIP_LOOKBACK_DAYS=${CHIP_LOOKBACK_DAYS}"
-          echo "CHIP_WORKERS=${CHIP_WORKERS}"
-          echo "CHIP_LOG_EVERY=${CHIP_LOG_EVERY}"
-          echo "CHIP_VERBOSE=${CHIP_VERBOSE}"
+          python - <<'PY'
+          import os
+          for name in [
+              'REPORT_TYPE','CSV_FILE','REPORT_TITLE','OUTPUT_FILE',
+              'STATIC_OUTPUT_FILE','STATIC_CHIP_OUTPUT_FILE',
+              'CHIP_TREND_DAYS','CHIP_CONCENTRATION_THRESHOLD',
+              'CHIP_LOOKBACK_DAYS','CHIP_WORKERS','CHIP_SLEEP_SEC'
+          ]:
+              print(f'{name}={os.environ.get(name)}')
+          PY
 
       - name: Build chip static file
         env:
@@ -92,24 +86,16 @@ jobs:
             --lookback-days "${CHIP_LOOKBACK_DAYS}" \
             --sleep-sec "${CHIP_SLEEP_SEC}" \
             --workers "${CHIP_WORKERS}" \
-            --log-every "${CHIP_LOG_EVERY}" \
             2>&1 | tee chips_analysis_action.log
-
-      - name: Write compact chip summary
-        run: |
-          python - <<'PY' | tee chips_summary.log
+          python - <<'PY' | tee -a chips_analysis_action.log
           import os
           import pandas as pd
           path = os.environ['STATIC_CHIP_OUTPUT_FILE']
           df = pd.read_csv(path, encoding='utf-8-sig', dtype=str)
-          print(f'output={path}')
-          print(f'rows={len(df)}')
-          print('status=' + str(df['chips_status'].value_counts(dropna=False).to_dict()))
-          subset = df[df['chips_status'].astype(str).str.lower().isin(['error', 'no_data'])]
-          if not subset.empty:
-              cols = ['stock_id', 'name', 'chips_status', 'chips_reason']
-              print('notable=')
-              print(subset[cols].head(10).to_string(index=False))
+          cols = ['stock_id','name','chip_latest_date','main_force_net','broker_diff','chip_signal_state','chips_status']
+          print(df[cols].head(30).to_string(index=False))
+          print('rows=', len(df))
+          print('status=', df['chips_status'].value_counts(dropna=False).to_dict())
           PY
 
       - name: Upload chip artifacts
@@ -118,13 +104,12 @@ jobs:
           name: chip-static
           path: |
             ${{ env.STATIC_CHIP_OUTPUT_FILE }}
-            chips_summary.log
             chips_analysis_action.log
 
       - name: Commit chip static file
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "${STATIC_CHIP_OUTPUT_FILE}"
+          git add "${STATIC_CHIP_OUTPUT_FILE}" chips_analysis_action.log
           git diff --cached --quiet || git commit -m "Update ${STATIC_CHIP_OUTPUT_FILE}"
           git push
