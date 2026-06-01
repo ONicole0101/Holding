@@ -14,7 +14,7 @@ on:
         description: Parallel day requests per stock
         required: false
         default: "6"
-    schedule:
+  schedule:
     # 10:00 UTC = Taiwan time 18:00.
     - cron: "0 10 * * *"
 
