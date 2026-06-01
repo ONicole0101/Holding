@@ -16,6 +16,8 @@ from data_sources import (
 CHIP_DATA_COLS = [
     "chip_trend_days",
     "chip_concentration_threshold",
+    "chip_latest_date",
+    "chip_available_days",
     "chip_concentration_pct",
     "chip_concentration_score",
     "main_force_net",
@@ -24,6 +26,22 @@ CHIP_DATA_COLS = [
     "broker_diff_score",
     "chip_signal_state",
     "chip_signal_text",
+]
+
+# t0 = latest/current available trading day, t1 = previous trading day, t2 = two trading days ago.
+CHIP_DAILY_COLS = [
+    "chip_date_t0",
+    "chip_date_t1",
+    "chip_date_t2",
+    "chip_concentration_pct_t0",
+    "chip_concentration_pct_t1",
+    "chip_concentration_pct_t2",
+    "main_force_net_t0",
+    "main_force_net_t1",
+    "main_force_net_t2",
+    "broker_diff_t0",
+    "broker_diff_t1",
+    "broker_diff_t2",
 ]
 
 FINMIND_META_COLS = [
@@ -39,7 +57,7 @@ FINMIND_META_COLS = [
 ORDERED_COLS = [
     "stock_id",
     "name",
-] + CHIP_DATA_COLS + [
+] + CHIP_DATA_COLS + CHIP_DAILY_COLS + [
     "chips_updated_at",
     "chips_status",
     "chips_reason",
@@ -69,6 +87,39 @@ def compact_text(text: str, max_len: int = 180) -> str:
     if len(text) <= max_len:
         return text
     return text[: max_len - 3] + "..."
+
+
+def _first_present(mapping: dict, *keys: str):
+    for key in keys:
+        value = mapping.get(key)
+        if value not in (None, ""):
+            return value
+    return None
+
+
+def _normalize_chip_daily_fields(chip: dict) -> dict:
+    out = {col: None for col in CHIP_DAILY_COLS}
+    rows = chip.get("chip_recent_rows") or chip.get("recent_rows") or chip.get("daily_rows") or chip.get("chip_daily_rows") or []
+    if isinstance(rows, list):
+        for idx, row in enumerate(rows[:3]):
+            if not isinstance(row, dict):
+                continue
+            suffix = f"t{idx}"
+            out[f"chip_date_{suffix}"] = _first_present(row, "date", "Date", "chip_date", "chip_latest_date")
+            out[f"chip_concentration_pct_{suffix}"] = _first_present(row, "chip_concentration_pct", "籌碼集中度%", "concentration_pct")
+            out[f"main_force_net_{suffix}"] = _first_present(row, "main_force_net", "主力買賣超")
+            out[f"broker_diff_{suffix}"] = _first_present(row, "broker_diff", "買賣家數差")
+    for idx in range(3):
+        suffix = f"t{idx}"
+        out[f"chip_date_{suffix}"] = _first_present(chip, f"chip_date_{suffix}", f"chip_latest_date_{suffix}", f"chip_day{idx}_date", f"chip_date_{idx}") or out[f"chip_date_{suffix}"]
+        out[f"chip_concentration_pct_{suffix}"] = _first_present(chip, f"chip_concentration_pct_{suffix}", f"chip_day{idx}_concentration_pct", f"chip_concentration_pct_{idx}") or out[f"chip_concentration_pct_{suffix}"]
+        out[f"main_force_net_{suffix}"] = _first_present(chip, f"main_force_net_{suffix}", f"chip_day{idx}_main_force_net", f"main_force_net_{idx}") or out[f"main_force_net_{suffix}"]
+        out[f"broker_diff_{suffix}"] = _first_present(chip, f"broker_diff_{suffix}", f"chip_day{idx}_broker_diff", f"broker_diff_{idx}") or out[f"broker_diff_{suffix}"]
+    out["chip_date_t0"] = out["chip_date_t0"] or chip.get("chip_latest_date")
+    out["chip_concentration_pct_t0"] = out["chip_concentration_pct_t0"] or chip.get("chip_concentration_pct")
+    out["main_force_net_t0"] = out["main_force_net_t0"] or chip.get("main_force_net")
+    out["broker_diff_t0"] = out["broker_diff_t0"] or chip.get("broker_diff")
+    return out
 
 
 def normalize_finmind_usage_info(info: dict | None) -> dict:
@@ -158,6 +209,8 @@ def build_chip_row(s: dict, trend_days=None, concentration_threshold=None) -> di
         for c in CHIP_DATA_COLS:
             row[c] = chip.get(c)
 
+        row.update(_normalize_chip_daily_fields(chip))
+
         state = str(row.get("chip_signal_state") or "").strip().lower()
         if state and state != "no_data":
             row["chips_status"] = "ok"
@@ -218,8 +271,8 @@ def build_static_chips(stock_list, output_file, trend_days=None, concentration_t
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Rebuild Static_Chips.csv for broker chip data.")
-    parser.add_argument("--output", default=os.getenv("STATIC_CHIPS_FILE", getattr(config, "STATIC_CHIPS_OUTPUT_FILE", "Static_Chips.csv")))
+    parser = argparse.ArgumentParser(description="Rebuild AllStatic_Chips.csv for broker chip data.")
+    parser.add_argument("--output", default=os.getenv("STATIC_CHIPS_FILE", getattr(config, "STATIC_CHIPS_OUTPUT_FILE", "AllStatic_Chips.csv")))
     parser.add_argument("--trend-days", type=int, default=None, help="Override CHIP_TREND_DAYS.")
     parser.add_argument("--concentration-threshold", type=float, default=None, help="Override CHIP_CONCENTRATION_THRESHOLD.")
     parser.add_argument("--sleep-sec", type=float, default=0.2, help="Sleep between stocks.")

@@ -14,7 +14,7 @@ from technical_indicators import add_indicators, get_kd_trend, get_bb_trend, get
 
 
 STATIC_CSV_PATH = os.getenv("STATIC_CSV_FILE", "AllStatic.csv")
-STATIC_CHIPS_CSV_PATH = os.getenv("STATIC_CHIPS_FILE", "Static_Chips.csv")
+STATIC_CHIPS_CSV_PATH = os.getenv("STATIC_CHIPS_FILE") or os.getenv("STATIC_CHIP_FILE", "AllStatic_Chips.csv")
 _STATIC_MAP_CACHE = None
 _STATIC_MAP_MTIME = None
 _CHIPS_STATIC_MAP_CACHE = None
@@ -76,6 +76,7 @@ def load_static_map(static_csv_path=STATIC_CSV_PATH, force_reload=False):
         return {}
 
 
+
 def load_chips_static_map(static_chips_csv_path=STATIC_CHIPS_CSV_PATH, force_reload=False):
     global _CHIPS_STATIC_MAP_CACHE, _CHIPS_STATIC_MAP_MTIME
 
@@ -92,7 +93,7 @@ def load_chips_static_map(static_chips_csv_path=STATIC_CHIPS_CSV_PATH, force_rel
         df.columns = df.columns.str.strip()
 
         if "stock_id" not in df.columns:
-            print(f"⚠️ Static_Chips.csv 缺少 stock_id 欄位: {static_chips_csv_path}")
+            print(f"⚠️ AllStatic_Chips.csv 缺少 stock_id 欄位: {static_chips_csv_path}")
             return {}
 
         df = df.where(pd.notna(df), None)
@@ -108,9 +109,8 @@ def load_chips_static_map(static_chips_csv_path=STATIC_CHIPS_CSV_PATH, force_rel
         return chips_map
 
     except Exception as e:
-        print(f"❌ 讀取 Static_Chips.csv 失敗: {e}")
+        print(f"❌ 讀取 AllStatic_Chips.csv 失敗: {e}")
         return {}
-
 
 def to_float_or_none(v):
     if v is None:
@@ -539,23 +539,48 @@ def _build_static_fields(static_row):
     }
 
 
+
 def _build_chip_fields(chip_row):
+    latest_date = to_str_or_none(chip_row.get("chip_latest_date"))
+    latest_concentration = to_float_or_none(chip_row.get("chip_concentration_pct"))
+    latest_main_force = to_int_or_none(chip_row.get("main_force_net"))
+    latest_broker_diff = to_int_or_none(chip_row.get("broker_diff"))
+
+    t0_concentration = to_float_or_none(chip_row.get("chip_concentration_pct_t0"))
+    t0_main_force = to_int_or_none(chip_row.get("main_force_net_t0"))
+    t0_broker_diff = to_int_or_none(chip_row.get("broker_diff_t0"))
+
     return {
         "chip_trend_days": to_int_or_none(chip_row.get("chip_trend_days")),
         "chip_concentration_threshold": to_float_or_none(chip_row.get("chip_concentration_threshold")),
-        "chip_concentration_pct": to_float_or_none(chip_row.get("chip_concentration_pct")),
+        "chip_latest_date": latest_date,
+        "chip_available_days": to_int_or_none(chip_row.get("chip_available_days")),
+        "chip_concentration_pct": latest_concentration,
         "chip_concentration_score": to_float_or_none(chip_row.get("chip_concentration_score")),
-        "main_force_net": to_int_or_none(chip_row.get("main_force_net")),
+        "main_force_net": latest_main_force,
         "main_force_score": to_float_or_none(chip_row.get("main_force_score")),
-        "broker_diff": to_int_or_none(chip_row.get("broker_diff")),
+        "broker_diff": latest_broker_diff,
         "broker_diff_score": to_float_or_none(chip_row.get("broker_diff_score")),
+
+        "chip_date_t0": to_str_or_none(chip_row.get("chip_date_t0")) or latest_date,
+        "chip_date_t1": to_str_or_none(chip_row.get("chip_date_t1")),
+        "chip_date_t2": to_str_or_none(chip_row.get("chip_date_t2")),
+        "chip_concentration_pct_t0": t0_concentration if t0_concentration is not None else latest_concentration,
+        "chip_concentration_pct_t1": to_float_or_none(chip_row.get("chip_concentration_pct_t1")),
+        "chip_concentration_pct_t2": to_float_or_none(chip_row.get("chip_concentration_pct_t2")),
+        "main_force_net_t0": t0_main_force if t0_main_force is not None else latest_main_force,
+        "main_force_net_t1": to_int_or_none(chip_row.get("main_force_net_t1")),
+        "main_force_net_t2": to_int_or_none(chip_row.get("main_force_net_t2")),
+        "broker_diff_t0": t0_broker_diff if t0_broker_diff is not None else latest_broker_diff,
+        "broker_diff_t1": to_int_or_none(chip_row.get("broker_diff_t1")),
+        "broker_diff_t2": to_int_or_none(chip_row.get("broker_diff_t2")),
+
         "chip_signal_state": to_str_or_none(chip_row.get("chip_signal_state")),
         "chip_signal_text": to_str_or_none(chip_row.get("chip_signal_text")),
         "chips_status": to_str_or_none(chip_row.get("chips_status")),
         "chips_reason": to_str_or_none(chip_row.get("chips_reason")),
         "chips_updated_at": to_str_or_none(chip_row.get("chips_updated_at")),
     }
-
 
 def get_full_stock_analysis(stock_list, static_map=None, chips_map=None):
     results = []

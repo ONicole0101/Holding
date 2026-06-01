@@ -62,12 +62,6 @@ def get_static_csv_path():
     return env_path or config_path or "AllStatic.csv"
 
 
-def get_static_chips_csv_path():
-    config_path = getattr(config, "STATIC_CHIPS_OUTPUT_FILE", None)
-    env_path = os.getenv("STATIC_CHIPS_FILE")
-    return env_path or config_path or "Static_Chips.csv"
-
-
 def format_output(results):
     results = enrich_html_fields([r for r in results if r])
 
@@ -118,7 +112,6 @@ def main():
         report_title = config.REPORT_TITLE
         output_file = config.OUTPUT_FILE
         static_csv_file = get_static_csv_path()
-        static_chips_csv_file = get_static_chips_csv_path()
 
         df = pd.read_csv(csv_file, sep="\t", encoding="utf-8-sig", dtype=str)
         df.columns = df.columns.str.strip()
@@ -131,20 +124,13 @@ def main():
         return
 
     if not os.path.exists(static_csv_file):
-        print(f"❌ 找不到財務靜態資料檔：{static_csv_file}")
+        print(f"❌ 找不到靜態資料檔：{static_csv_file}")
         print("請先執行 generate_static_csv.py 產生 AllStatic.csv")
-        return
-
-    if not os.path.exists(static_chips_csv_file):
-        print(f"❌ 找不到籌碼靜態資料檔：{static_chips_csv_file}")
-        print("請先執行 generate_static_chips.py 產生 Static_Chips.csv")
         return
 
     # 讓 stock_service.py 能讀到同一路徑
     os.environ["STATIC_CSV_FILE"] = static_csv_file
-    os.environ["STATIC_CHIPS_FILE"] = static_chips_csv_file
-    print(f"📄 使用財務靜態資料檔：{static_csv_file}")
-    print(f"📄 使用籌碼靜態資料檔：{static_chips_csv_file}")
+    print(f"📄 使用靜態資料檔：{static_csv_file}")
 
     start_used = start_limit = start_remain = None
 

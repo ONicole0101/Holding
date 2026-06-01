@@ -59,20 +59,36 @@ try:
         print(recent_3_days.to_string(index=False))
         print("-" * 40)
 
-        # 6. 核心邏輯判斷（連續3天主力買、家數差為負）
-        is_main_buying = all(recent_3_days['主力買賣超'] > 0)
-        is_house_decreasing = all(recent_3_days['買賣家數差'] < 0)
+        # 6. 產出可丟進 signals.get_tech_signal(...) 的三日籌碼欄位
+        main_buy_days = int((recent_3_days['主力買賣超'] > 0).sum())
+        main_sell_days = int((recent_3_days['主力買賣超'] < 0).sum())
+        main_net_3d = int(recent_3_days['主力買賣超'].sum())
+        broker_diff_score = int(recent_3_days['買賣家數差'].sum())
 
-        if is_main_buying and is_house_decreasing:
-            print(f"🔥 訊號觸發！股票 {stock_id} 出現『連續3天籌碼高度集中』！")
-            print("→ 原因：連續3天主力大買，且券商家數變少（少數大戶收走散戶股票）。")
-        elif is_main_buying:
-            print(f"⚠️ 提示：連續3天主力買進，但家數差未完全收斂，籌碼可能稍嫌分散。")
-        elif all(recent_3_days['主力買賣超'] < 0) and all(recent_3_days['買賣家數差'] > 0):
-            print(f"🚨 警報！股票 {stock_id} 出現『連續3天大戶出貨』！")
-            print("→ 原因：連續3天主力大賣，且券商家數變多（股票散落到散戶手中）。")
+        chip_context = {
+            'main_buy_days': main_buy_days,
+            'main_sell_days': main_sell_days,
+            'main_net_3d': main_net_3d,
+            'broker_diff_score': broker_diff_score,
+            # 下面欄位請由價格/量能模組補入後一起傳給 get_tech_signal
+            'price_change_3d': None,
+            'volume_change_3d': None,
+            'close_position': None,
+            'repeat_buy_brokers': None,
+            'repeat_sell_brokers': None,
+        }
+
+        print("\n【可傳入 signals.get_tech_signal 的三日籌碼欄位】")
+        print(chip_context)
+
+        if main_buy_days >= 2 and broker_diff_score < 0:
+            print(f"🔥 籌碼判斷：股票 {stock_id} 主力連續買超且買賣家數差收斂，籌碼偏多。")
+        elif main_buy_days >= 2:
+            print(f"⚠️ 籌碼判斷：股票 {stock_id} 主力連續買超，但買賣家數差尚未明顯收斂。")
+        elif main_sell_days >= 2 and broker_diff_score > 0:
+            print(f"🚨 籌碼判斷：股票 {stock_id} 主力連續賣超且買賣家數差擴散，籌碼偏空。")
         else:
-            print(" 籌碼處於震盪洗盤階段，方向未定，建議繼續觀察。")
+            print("籌碼判斷：籌碼處於震盪洗盤階段，方向未定。")
 
 except Exception as e:
     print(f"程式執行出錯: {e}")

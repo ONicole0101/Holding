@@ -272,6 +272,40 @@
       color: #00b050;
     }
 
+
+    .chip-detail {
+      text-align: center;
+      line-height: 1.25;
+      min-width: 92px;
+    }
+
+    .chip-arrow {
+      font-size: clamp(11px, 1vw, 13px);
+      line-height: 1.2;
+      margin-bottom: 2px;
+    }
+
+    .chip-line {
+      line-height: 1.3;
+      font-size: clamp(11px, 1vw, 12px);
+    }
+
+    .chip-line-small {
+      line-height: 1.25;
+      font-size: clamp(10px, 0.9vw, 11px);
+      color: #8b949e;
+    }
+
+    .chip-line.up,
+    .chip-line-small.up {
+      color: #f85149;
+    }
+
+    .chip-line.dn,
+    .chip-line-small.dn {
+      color: #3fb950;
+    }
+
     .mobile-list {
       display: none;
     }
@@ -474,7 +508,41 @@
         display: none;
       }
 
-      .mobile-list {
+  
+    .chip-detail {
+      text-align: center;
+      line-height: 1.25;
+      min-width: 92px;
+    }
+
+    .chip-arrow {
+      font-size: clamp(11px, 1vw, 13px);
+      line-height: 1.2;
+      margin-bottom: 2px;
+    }
+
+    .chip-line {
+      line-height: 1.3;
+      font-size: clamp(11px, 1vw, 12px);
+    }
+
+    .chip-line-small {
+      line-height: 1.25;
+      font-size: clamp(10px, 0.9vw, 11px);
+      color: #8b949e;
+    }
+
+    .chip-line.up,
+    .chip-line-small.up {
+      color: #f85149;
+    }
+
+    .chip-line.dn,
+    .chip-line-small.dn {
+      color: #3fb950;
+    }
+
+    .mobile-list {
         display: block;
       }
     }
@@ -484,9 +552,7 @@
 <body>
   <div class="container">
     <h2>{{report_title}}</h2>
-    {% if report_subtitle %}
     <p>{{ report_subtitle }}</p>
-    {% endif %}
     <p>產生時間：{{ generated_time }}</p>
 
     <div class="tabs" id="tabs">
@@ -539,18 +605,6 @@
           <option value=">">&gt;</option>
           <option value="<">&lt;</option>
         </select><input data-filter-key="volume_ratio" type="number" step="0.01" placeholder="數值"></div>
-      <div class="filter-item"><label>籌碼集中</label><select data-filter-op="chip_concentration_score">
-          <option value=">">&gt;</option>
-          <option value="<">&lt;</option>
-        </select><input data-filter-key="chip_concentration_score" type="number" step="0.5" placeholder="分數"></div>
-      <div class="filter-item"><label>主力趨勢</label><select data-filter-op="main_force_score">
-          <option value=">">&gt;</option>
-          <option value="<">&lt;</option>
-        </select><input data-filter-key="main_force_score" type="number" step="0.5" placeholder="分數"></div>
-      <div class="filter-item"><label>家數差</label><select data-filter-op="broker_diff">
-          <option value=">">&gt;</option>
-          <option value="<">&lt;</option>
-        </select><input data-filter-key="broker_diff" type="number" step="1" placeholder="家數"></div>
       <div class="filter-actions">
         <button type="button" id="applyFilterBtn">套用</button>
         <button type="button" class="secondary" id="clearFilterBtn">清除</button>
@@ -594,13 +648,13 @@
         ]
       },
       technical: {
-        note: "技術面：價格、量、籌碼、KD、布林、Bias、PER/PBR 60天區間",
+        note: "技術面：價格、KD、布林、Bias、PER/PBR 60天區間",
         columns: [
           { key: "code", label: "代碼<br><small>名稱</small>" },
           { key: "price", label: "價格<br><small>60天LH</small>" },
           { key: "chgPct", label: "漲跌%<br><small>震幅%</small>" },
           { key: "volume", label: "量<br><small>昨/增/張</small>", cls: "col-volume" },
-          { key: "chip_concentration_score", label: "籌碼集中門檻%<br><small>3天趨勢</small>" },
+          { key: "chip_concentration_score", label: "籌碼集中%<br><small>3天趨勢</small>" },
           { key: "main_force_score", label: "主力買賣超<br><small>3天趨勢</small>" },
           { key: "broker_diff", label: "買賣家數差<br><small>趨勢</small>" },
           { key: "k", label: "日KD<br><small>3天趨勢</small>" },
@@ -636,7 +690,7 @@
           { key: "price", label: "價格<br><small>60天LH</small>" },
           { key: "chgPct", label: "漲跌%<br><small>震幅%</small>" },
           { key: "volume", label: "量<br><small>昨/增/張</small>", cls: "col-volume" },
-          { key: "chip_concentration_score", label: "籌碼集中門檻%<br><small>3天趨勢</small>" },
+          { key: "chip_concentration_score", label: "籌碼集中%<br><small>3天趨勢</small>" },
           { key: "main_force_score", label: "主力買賣超<br><small>3天趨勢</small>" },
           { key: "broker_diff", label: "買賣家數差<br><small>趨勢</small>" },
           { key: "k", label: "日KD<br><small>3天趨勢</small>" },
@@ -679,15 +733,6 @@
       if (v <= -1) return "dn strong";
       if (v < 0) return "dn";
       return "";
-    }
-
-    function chipDaysLabel(s) {
-      const days = Number(s.chip_trend_days ?? 3);
-      return Number.isFinite(days) && days > 0 ? `${days}天` : "3天";
-    }
-
-    function chipThresholdLabel(s) {
-      return isNil(s.chip_concentration_threshold) ? "-" : `${fmt(s.chip_concentration_threshold, "%")}`;
     }
 
     function renderMetric3(value, m, q, y, suffix = "") {
@@ -735,12 +780,110 @@
       return String(dateText);
     }
 
-    <!-- 處置股起迄日期 -->
+
+    function chipDaysLabel(s) {
+      const days = Number(s.chip_trend_days ?? 3);
+      return Number.isFinite(days) && days > 0 ? `${days}天` : "3天";
+    }
+
+    function chipThresholdLabel(s) {
+      return isNil(s.chip_concentration_threshold) ? "-" : `${fmt(s.chip_concentration_threshold, "%")}`;
+    }
+
+    function chipValueClass(current, previous) {
+      if (isNil(current) || isNil(previous)) return "";
+      const cur = Number(current);
+      const prev = Number(previous);
+      if (!Number.isFinite(cur) || !Number.isFinite(prev)) return "";
+      if (cur > prev) return "up";
+      if (cur < prev) return "dn";
+      return "";
+    }
+
+    function chipDateMMDD(dateText, fallback = "") {
+      const value = fmtMonthDay(dateText);
+      return value ? value.replace("/", "") : fallback;
+    }
+
+    function chipLine(dateText, value, previousValue, suffix = "", unit = "", small = false, fallbackLabel = "") {
+      const cls = small ? "chip-line-small" : "chip-line";
+      const colorCls = previousValue === undefined ? "" : chipValueClass(value, previousValue);
+      const label = chipDateMMDD(dateText, fallbackLabel);
+      const displayValue = isNil(value) ? "-" : `${fmt(value, suffix)}${unit}`;
+      return `<div class="${cls} ${colorCls}">${label ? `${label}：` : ""}${displayValue}</div>`;
+    }
+
+    function renderChipConcentrationCell(s) {
+      return `
+        <td>
+          <div class="chip-detail">
+            <div class="chip-arrow ${trendClass(s.chip_concentration_score)}">${isNil(s.chip_concentration_score) ? "-" : fmtTrend(s.chip_concentration_score)}</div>
+            ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, s.chip_concentration_pct_t0 ?? s.chip_concentration_pct, s.chip_concentration_pct_t1, "%", "", false, "今日")}
+            ${chipLine(s.chip_date_t1, s.chip_concentration_pct_t1, s.chip_concentration_pct_t2, "%", "", true, "T-1")}
+            ${chipLine(s.chip_date_t2, s.chip_concentration_pct_t2, undefined, "%", "", true, "T-2")}
+          </div>
+        </td>`;
+    }
+
+    function renderMainForceCell(s) {
+      return `
+        <td>
+          <div class="chip-detail">
+            <div class="chip-arrow ${trendClass(s.main_force_score)}">${isNil(s.main_force_score) ? "-" : fmtTrend(s.main_force_score)}</div>
+            ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, s.main_force_net_t0 ?? s.main_force_net, s.main_force_net_t1, "", "張", false, "今日")}
+            ${chipLine(s.chip_date_t1, s.main_force_net_t1, s.main_force_net_t2, "", "張", false, "T-1")}
+            ${chipLine(s.chip_date_t2, s.main_force_net_t2, undefined, "", "張", false, "T-2")}
+          </div>
+        </td>`;
+    }
+
+    function renderBrokerDiffCell(s) {
+      return `
+        <td>
+          <div class="chip-detail">
+            <div class="chip-arrow ${trendClass(s.broker_diff_score)}">${isNil(s.broker_diff_score) ? "-" : fmtTrend(s.broker_diff_score)}</div>
+            ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, s.broker_diff_t0 ?? s.broker_diff, s.broker_diff_t1, "", "家", false, "今日")}
+            ${chipLine(s.chip_date_t1, s.broker_diff_t1, s.broker_diff_t2, "", "家", false, "T-1")}
+            ${chipLine(s.chip_date_t2, s.broker_diff_t2, undefined, "", "家", false, "T-2")}
+          </div>
+        </td>`;
+    }
+
+    function renderChipConcentrationBlock(s) {
+      return `
+        <div class="stock-value">
+          <div class="chip-arrow ${trendClass(s.chip_concentration_score)}">${isNil(s.chip_concentration_score) ? "-" : fmtTrend(s.chip_concentration_score)}</div>
+          ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, s.chip_concentration_pct_t0 ?? s.chip_concentration_pct, s.chip_concentration_pct_t1, "%", "", false, "今日")}
+          ${chipLine(s.chip_date_t1, s.chip_concentration_pct_t1, s.chip_concentration_pct_t2, "%", "", true, "T-1")}
+          ${chipLine(s.chip_date_t2, s.chip_concentration_pct_t2, undefined, "%", "", true, "T-2")}
+        </div>`;
+    }
+
+    function renderMainForceBlock(s) {
+      return `
+        <div class="stock-value">
+          <div class="chip-arrow ${trendClass(s.main_force_score)}">${isNil(s.main_force_score) ? "-" : fmtTrend(s.main_force_score)}</div>
+          ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, s.main_force_net_t0 ?? s.main_force_net, s.main_force_net_t1, "", "張", false, "今日")}
+          ${chipLine(s.chip_date_t1, s.main_force_net_t1, s.main_force_net_t2, "", "張", false, "T-1")}
+          ${chipLine(s.chip_date_t2, s.main_force_net_t2, undefined, "", "張", false, "T-2")}
+        </div>`;
+    }
+
+    function renderBrokerDiffBlock(s) {
+      return `
+        <div class="stock-value">
+          <div class="chip-arrow ${trendClass(s.broker_diff_score)}">${isNil(s.broker_diff_score) ? "-" : fmtTrend(s.broker_diff_score)}</div>
+          ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, s.broker_diff_t0 ?? s.broker_diff, s.broker_diff_t1, "", "家", false, "今日")}
+          ${chipLine(s.chip_date_t1, s.broker_diff_t1, s.broker_diff_t2, "", "家", false, "T-1")}
+          ${chipLine(s.chip_date_t2, s.broker_diff_t2, undefined, "", "家", false, "T-2")}
+        </div>`;
+    }
+
     function dispositionPeriodText(s) {
       const start = fmtMonthDay(s.period_start ?? s.disposition_period_start);
       const end = fmtMonthDay(s.period_end ?? s.disposition_period_end);
       if (!start || !end) return "";
-      return `${start}<br />${end}`;
+      return `${start}-${end}`;
     }
 
     function shortName(name) {
@@ -807,26 +950,11 @@
               <div class="table-lv3">${isNil(s.volume_add) ? "-" : `${fmt(s.volume_add)}張`}</div>
             </td>`;
         case "chip_concentration_score":
-          return `
-            <td>
-              <div class="table-lv1 ${trendClass(s.chip_concentration_score)}">${isNil(s.chip_concentration_score) ? "-" : fmtTrend(s.chip_concentration_score)}</div>
-              <div class="table-lv2">${chipDaysLabel(s)}</div>
-              <div class="table-lv2">門檻 ${chipThresholdLabel(s)}</div>
-              <div class="table-lv3">最新 ${fmt(s.chip_concentration_pct, "%")}</div>
-            </td>`;
+          return renderChipConcentrationCell(s);
         case "main_force_score":
-          return `
-            <td>
-              <div class="table-lv1 ${trendClass(s.main_force_score)}">${isNil(s.main_force_score) ? "-" : fmtTrend(s.main_force_score)}</div>
-              <div class="table-lv2">${fmt(s.main_force_net)}張</div>
-              <div class="table-lv3">${s.chip_signal_text ?? ""}</div>
-            </td>`;
+          return renderMainForceCell(s);
         case "broker_diff":
-          return `
-            <td>
-              <div class="table-lv1 ${trendClass(s.broker_diff_score)}">${isNil(s.broker_diff_score) ? "-" : fmtTrend(s.broker_diff_score)}</div>
-              <div class="table-lv2">${fmt(s.broker_diff)}家</div>
-            </td>`;
+          return renderBrokerDiffCell(s);
         case "eps_Y":
           return `
             <td>
@@ -910,9 +1038,9 @@
           <div class="stock-item"><div class="stock-label">日Bias18 LH</div><div class="stock-value">${renderRangeMetric(s.bias18, s.bias18_min, s.bias18_max, "%", distClass(s.bias18))}</div></div>
           <div class="stock-item"><div class="stock-label">日Bias50 LH</div><div class="stock-value">${renderRangeMetric(s.bias50, s.bias50_min, s.bias50_max, "%", distClass(s.bias50))}</div></div>
           <div class="stock-item"><div class="stock-label">量 / 昨 / 增 / 張</div><div class="stock-value"><div>${fmt(s.volume)} 張</div><div class="table-lv2">昨 ${fmt(s.prev_volume)}</div><div class="table-lv2 ${trendClass(s.volume_ratio)}">${isNil(s.volume_ratio) ? "-" : `${fmtTrend(s.volume_ratio)} ${fmt(s.volume_ratio, "%")}`}</div><div class="table-lv2">${isNil(s.volume_add) ? "-" : `${fmt(s.volume_add)} 張`}</div></div></div>
-          <div class="stock-item"><div class="stock-label">籌碼集中${chipDaysLabel(s)}趨勢</div><div class="stock-value"><div class="table-lv1 ${trendClass(s.chip_concentration_score)}">${isNil(s.chip_concentration_score) ? "-" : fmtTrend(s.chip_concentration_score)}</div><div class="table-lv2">最新 ${fmt(s.chip_concentration_pct, "%")} / 門檻 ${chipThresholdLabel(s)}</div></div></div>
-          <div class="stock-item"><div class="stock-label">主力買賣超${chipDaysLabel(s)}趨勢</div><div class="stock-value"><div class="table-lv1 ${trendClass(s.main_force_score)}">${isNil(s.main_force_score) ? "-" : fmtTrend(s.main_force_score)}</div><div class="table-lv2">${fmt(s.main_force_net)} 張</div></div></div>
-          <div class="stock-item"><div class="stock-label">買賣家數差</div><div class="stock-value"><div class="table-lv1 ${trendClass(s.broker_diff_score)}">${isNil(s.broker_diff_score) ? "-" : fmtTrend(s.broker_diff_score)}</div><div class="table-lv2">${fmt(s.broker_diff)} 家</div></div></div>
+          <div class="stock-item"><div class="stock-label">籌碼集中${chipDaysLabel(s)}趨勢</div>${renderChipConcentrationBlock(s)}</div>
+          <div class="stock-item"><div class="stock-label">主力買賣超${chipDaysLabel(s)}趨勢</div>${renderMainForceBlock(s)}</div>
+          <div class="stock-item"><div class="stock-label">買賣家數差</div>${renderBrokerDiffBlock(s)}</div>
         </div>`;
 
       const fundamentalGrid = `

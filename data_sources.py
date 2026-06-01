@@ -390,10 +390,8 @@ def get_profit_ratio(stock_id):
             'start_date': '2020-01-01',
             'token': FINMIND_token,
         }
-        _record_finmind_request("profit source", stock_id,
-                                "TaiwanStockFinancialStatements")
-        res = requests.get(API_URL, params=params,
-                           headers=headers, timeout=300)
+        _record_finmind_request("profit source", stock_id, "TaiwanStockFinancialStatements")
+        res = requests.get(API_URL, params=params, headers=headers, timeout=300)
         data = _safe_response_json(res)
         _print_initial_quota_once(data, res)
 
@@ -506,8 +504,7 @@ def get_per_pbr_60d_stats(stock_id, days=60):
             "token": FINMIND_token,
         }
         _record_finmind_request("PER/PBR 60D", stock_id, "TaiwanStockPER")
-        res = requests.get(API_URL, params=params,
-                           headers=headers, timeout=300)
+        res = requests.get(API_URL, params=params, headers=headers, timeout=300)
         res_data = _safe_response_json(res)
         _print_initial_quota_once(res_data, res)
 
@@ -533,10 +530,8 @@ def get_per_pbr_60d_stats(stock_id, days=60):
         if df_win.empty:
             df_win = df.copy()
 
-        per_col = next(
-            (c for c in ["price_earning_ratio", "PER", "per"] if c in df_win.columns), None)
-        pbr_col = next(
-            (c for c in ["price_book_ratio", "PBR", "pbr"] if c in df_win.columns), None)
+        per_col = next((c for c in ["price_earning_ratio", "PER", "per"] if c in df_win.columns), None)
+        pbr_col = next((c for c in ["price_book_ratio", "PBR", "pbr"] if c in df_win.columns), None)
 
         def latest_valid(col):
             if not col:
@@ -546,8 +541,7 @@ def get_per_pbr_60d_stats(stock_id, days=60):
             if valid.empty:
                 return None, None, False
             latest_valid_date = valid["date"].max()
-            latest_value = valid.loc[valid["date"]
-                                     == latest_valid_date, col].iloc[-1]
+            latest_value = valid.loc[valid["date"] == latest_valid_date, col].iloc[-1]
             return safe_round(latest_value), latest_valid_date, bool(latest_valid_date < latest_row_date)
 
         per, per_date, per_is_prev = latest_valid(per_col)
@@ -646,36 +640,79 @@ def _score_by_ratio(ratio):
     return 0
 
 
-def get_chip_analysis(stock_id, trend_days=None, concentration_threshold=None):
+def get_chip_analysis(stock_id, trend_days=None, concentration_threshold=None, lookback_days=None, workers=None):
     """
     取得近 N 個交易日券商分點籌碼，輸出給 AllStatic/template/signals 使用。
 
-    回傳欄位重點：
-    - chip_concentration_score：籌碼集中趨勢箭頭分數（可直接給前端 fmtTrend）
-    - main_force_score：主力買賣超 N 天趨勢箭頭分數
-    - broker_diff_score：買賣家數差 N 天趨勢箭頭分數
-    - chip_signal_state：bullish_concentrated / bullish_distributed /
-      bearish_distributed / neutral
+    修正重點：
+    - 回傳 latest 彙總欄位。
+    - 同時回傳最近 3 個交易日明細 recent_rows。
+    - 同時展開 chip_date_t0/t1/t2、chip_concentration_pct_t0/t1/t2、
+      main_force_net_t0/t1/t2、broker_diff_t0/t1/t2。
     """
     days, threshold = get_chip_config(trend_days, concentration_threshold)
+    try:
+        lookback_days = int(lookback_days) if lookback_days is not None else _env_int(
+            "CHIP_LOOKBACK_DAYS", max(days * 7, 21), min_value=3, max_value=120
+        )
+    except Exception:
+        lookback_days = max(days * 7, 21)
+    lookback_days = max(days, min(int(lookback_days), 120))
+
     empty = {
         "chip_trend_days": days,
         "chip_concentration_threshold": threshold,
+        "chip_latest_date": None,
+        "chip_available_days": 0,
         "chip_concentration_pct": None,
+        "chip_concentration_pct_t0": None,
+        "chip_concentration_pct_t1": None,
+        "chip_concentration_pct_t2": None,
+        "chip_date_t0": None,
+        "chip_date_t1": None,
+        "chip_date_t2": None,
         "chip_concentration_score": None,
         "main_force_net": None,
+        "main_force_net_t0": None,
+        "main_force_net_t1": None,
+        "main_force_net_t2": None,
         "main_force_score": None,
         "broker_diff": None,
+        "broker_diff_t0": None,
+        "broker_diff_t1": None,
+        "broker_diff_t2": None,
         "broker_diff_score": None,
         "chip_signal_state": "no_data",
         "chip_signal_text": "籌碼資料不足",
+        "recent_rows": [],
     }
 
+    def _round_or_none(value, ndigits=2):
+        try:
+            if pd.isna(value):
+                return None
+            return round(float(value), ndigits)
+        except Exception:
+            return None
+
+    def _int_or_none(value):
+        try:
+            if pd.isna(value):
+                return None
+            return int(round(float(value)))
+        except Exception:
+            return None
+
     try:
-        start_date = datetime.today().date() - timedelta(days=max(days * 7, 21))
+        start_date = datetime.today().date() - timedelta(days=lookback_days)
         end_date = datetime.today().date()
         daily = []
         current_date = start_date
+
+        suppress_api_logs = str(os.getenv("CHIP_SUPPRESS_API_LOGS", "1")).strip().lower() in {
+            "1", "true", "yes", "y", "on"
+        }
+
         while current_date <= end_date:
             date_str = current_date.strftime("%Y-%m-%d")
             params = {
@@ -684,94 +721,89 @@ def get_chip_analysis(stock_id, trend_days=None, concentration_threshold=None):
                 "start_date": date_str,
                 "token": FINMIND_token,
             }
-            print(
-                f"🔎 chip analysis request: dataset={params['dataset']} stock_id={stock_id} date={date_str} token_present={bool(FINMIND_token)}")
+
+            if not suppress_api_logs:
+                print(
+                    f"🔎 chip analysis request: dataset={params['dataset']} stock_id={stock_id} date={date_str} token_present={bool(FINMIND_token)}"
+                )
+
             _record_finmind_request(
-                "chip analysis", stock_id, "TaiwanStockTradingDailyReport")
-            res = requests.get(API_URL, params=params,
-                               headers=headers, timeout=300)
-            print(f"🔄 chip analysis response status: {res.status_code}")
+                "chip analysis", stock_id, "TaiwanStockTradingDailyReport"
+            )
+            res = requests.get(API_URL, params=params, headers=headers, timeout=300)
+
+            if not suppress_api_logs:
+                print(f"🔄 chip analysis response status: {res.status_code}")
+
             res_data = _safe_response_json(res)
             _print_initial_quota_once(res_data, res)
 
             if res.status_code != 200:
-                _print_api_status_error(
-                    "chip analysis", stock_id, res, res_data)
-                if res.status_code == 422:
-                    try:
-                        js = res.json()
-                        if js:
-                            print(f"🔍 FinMind 422 detail: {js}")
-                    except Exception:
-                        pass
+                _print_api_status_error("chip analysis", stock_id, res, res_data)
                 return empty
 
             data = res_data.get("data", [])
-            if data:
-                df = pd.DataFrame(data)
-                broker_column = None
-                if "broker" in df.columns:
-                    broker_column = "broker"
-                elif "securities_trader" in df.columns:
-                    broker_column = "securities_trader"
-                elif "securities_trader_id" in df.columns:
-                    broker_column = "securities_trader_id"
+            if not data:
+                current_date += timedelta(days=1)
+                continue
 
-                required = {"date", "stock_id", "buy", "sell"}
-                if broker_column:
-                    required.add(broker_column)
+            df = pd.DataFrame(data)
+            broker_column = None
+            if "broker" in df.columns:
+                broker_column = "broker"
+            elif "securities_trader" in df.columns:
+                broker_column = "securities_trader"
+            elif "securities_trader_id" in df.columns:
+                broker_column = "securities_trader_id"
 
-                if not required.issubset(df.columns):
-                    print(
-                        f"⚠️ chip analysis missing cols {stock_id} on {date_str}: cols={list(df.columns)}")
-                    current_date += timedelta(days=1)
-                    continue
+            required = {"date", "stock_id", "buy", "sell"}
+            if broker_column:
+                required.add(broker_column)
 
-                if broker_column is None:
-                    print(
-                        f"⚠️ chip analysis no broker-like column found for {stock_id} on {date_str}: cols={list(df.columns)}")
-                    current_date += timedelta(days=1)
-                    continue
+            if not required.issubset(df.columns) or broker_column is None:
+                if not suppress_api_logs:
+                    print(f"⚠️ chip analysis missing cols {stock_id} on {date_str}: cols={list(df.columns)}")
+                current_date += timedelta(days=1)
+                continue
 
-                df = df[df["stock_id"].astype(str) == str(stock_id)]
-                if df.empty:
-                    print(
-                        f"⚠️ chip analysis no rows for {stock_id} on {date_str}")
-                    current_date += timedelta(days=1)
-                    continue
+            df = df[df["stock_id"].astype(str) == str(stock_id)]
+            if df.empty:
+                current_date += timedelta(days=1)
+                continue
 
-                df["date"] = pd.to_datetime(df["date"], errors="coerce")
-                df["buy"] = pd.to_numeric(df["buy"], errors="coerce").fillna(0)
-                df["sell"] = pd.to_numeric(
-                    df["sell"], errors="coerce").fillna(0)
-                df = df.dropna(subset=["date"])
-                if not df.empty:
-                    df["net_buy"] = df["buy"] - df["sell"]
-                    active_buyers = df.loc[df["buy"]
-                                           > 0, broker_column].nunique()
-                    active_sellers = df.loc[df["sell"]
-                                            > 0, broker_column].nunique()
-                    broker_diff = int(active_buyers - active_sellers)
+            df["date"] = pd.to_datetime(df["date"], errors="coerce")
+            df["buy"] = pd.to_numeric(df["buy"], errors="coerce").fillna(0)
+            df["sell"] = pd.to_numeric(df["sell"], errors="coerce").fillna(0)
+            df = df.dropna(subset=["date"])
+            if df.empty:
+                current_date += timedelta(days=1)
+                continue
 
-                    sorted_group = df.sort_values("net_buy", ascending=False)
-                    top_buy = sorted_group.head(15)["net_buy"].sum()
-                    top_sell = sorted_group.tail(15)["net_buy"].sum()
-                    main_force_net = float(top_buy + top_sell)
-                    total_turnover = float((df["buy"] + df["sell"]).sum())
-                    concentration_pct = (
-                        abs(main_force_net) / total_turnover * 100) if total_turnover else None
+            df["net_buy"] = df["buy"] - df["sell"]
+            active_buyers = df.loc[df["buy"] > 0, broker_column].nunique()
+            active_sellers = df.loc[df["sell"] > 0, broker_column].nunique()
+            broker_diff = int(active_buyers - active_sellers)
 
-                    daily.append({
-                        "date": current_date,
-                        "main_force_net": main_force_net,
-                        "broker_diff": broker_diff,
-                        "chip_concentration_pct": concentration_pct,
-                    })
+            sorted_group = df.sort_values("net_buy", ascending=False)
+            top_buy = sorted_group.head(15)["net_buy"].sum()
+            top_sell = sorted_group.tail(15)["net_buy"].sum()
+            main_force_net = float(top_buy + top_sell)
+            total_turnover = float((df["buy"] + df["sell"]).sum())
+            concentration_pct = (
+                abs(main_force_net) / total_turnover * 100
+            ) if total_turnover else None
+
+            actual_date = df["date"].max().date()
+            daily.append({
+                "date": actual_date,
+                "chip_concentration_pct": concentration_pct,
+                "main_force_net": main_force_net,
+                "broker_diff": broker_diff,
+            })
 
             current_date += timedelta(days=1)
 
-        report = pd.DataFrame(daily).sort_values(
-            "date", ascending=False).head(days)
+        report = pd.DataFrame(daily).sort_values("date", ascending=False).head(days)
         if report.empty:
             return empty
 
@@ -785,8 +817,7 @@ def get_chip_analysis(stock_id, trend_days=None, concentration_threshold=None):
 
         main_score = _score_by_ratio((main_pos - main_neg) / len(report))
         broker_score = _score_by_ratio((diff_pos - diff_neg) / len(report))
-        concentration_score = _score_by_ratio(
-            (conc_pos - conc_neg) / len(report))
+        concentration_score = _score_by_ratio((conc_pos - conc_neg) / len(report))
 
         latest = report.iloc[0]
         state = "neutral"
@@ -804,18 +835,48 @@ def get_chip_analysis(stock_id, trend_days=None, concentration_threshold=None):
             state = "bearish"
             text = f"主力連{days}賣，籌碼偏弱"
 
-        return {
+        recent_rows = []
+        for _, r in report.head(3).iterrows():
+            date_value = r["date"]
+            date_text = date_value.strftime("%Y-%m-%d") if hasattr(date_value, "strftime") else str(date_value)[:10]
+            recent_rows.append({
+                "date": date_text,
+                "chip_concentration_pct": _round_or_none(r["chip_concentration_pct"], 2),
+                "main_force_net": _int_or_none(r["main_force_net"]),
+                "broker_diff": _int_or_none(r["broker_diff"]),
+            })
+
+        result = {
             "chip_trend_days": days,
             "chip_concentration_threshold": threshold,
-            "chip_concentration_pct": round(float(latest["chip_concentration_pct"]), 2) if pd.notna(latest["chip_concentration_pct"]) else None,
+            "chip_latest_date": recent_rows[0]["date"] if recent_rows else None,
+            "chip_available_days": len(report),
+            "chip_concentration_pct": _round_or_none(latest["chip_concentration_pct"], 2),
             "chip_concentration_score": concentration_score,
-            "main_force_net": int(round(float(latest["main_force_net"]))),
+            "main_force_net": _int_or_none(latest["main_force_net"]),
             "main_force_score": main_score,
-            "broker_diff": int(latest["broker_diff"]),
+            "broker_diff": _int_or_none(latest["broker_diff"]),
             "broker_diff_score": broker_score,
             "chip_signal_state": state,
             "chip_signal_text": text,
+            "recent_rows": recent_rows,
         }
+
+        for idx, rec in enumerate(recent_rows[:3]):
+            suffix = f"t{idx}"
+            result[f"chip_date_{suffix}"] = rec["date"]
+            result[f"chip_concentration_pct_{suffix}"] = rec["chip_concentration_pct"]
+            result[f"main_force_net_{suffix}"] = rec["main_force_net"]
+            result[f"broker_diff_{suffix}"] = rec["broker_diff"]
+
+        for suffix in ("t0", "t1", "t2"):
+            result.setdefault(f"chip_date_{suffix}", None)
+            result.setdefault(f"chip_concentration_pct_{suffix}", None)
+            result.setdefault(f"main_force_net_{suffix}", None)
+            result.setdefault(f"broker_diff_{suffix}", None)
+
+        return result
+
     except Exception as e:
         print(f"❌ chip analysis error {stock_id}: {e}")
         return empty
@@ -852,14 +913,12 @@ def get_disposition_securities_period(stock_id):
             stock_id,
             "TaiwanStockDispositionSecuritiesPeriod",
         )
-        res = requests.get(API_URL, params=params,
-                           headers=headers, timeout=300)
+        res = requests.get(API_URL, params=params, headers=headers, timeout=300)
         res_data = _safe_response_json(res)
         _print_initial_quota_once(res_data, res)
 
         if res.status_code != 200:
-            _print_api_status_error(
-                "disposition period", stock_id, res, res_data)
+            _print_api_status_error("disposition period", stock_id, res, res_data)
             return empty
 
         data = res_data.get("data", [])
@@ -873,10 +932,8 @@ def get_disposition_securities_period(stock_id):
             )
             return empty
 
-        df["period_start"] = pd.to_datetime(
-            df["period_start"], errors="coerce").dt.date
-        df["period_end"] = pd.to_datetime(
-            df["period_end"], errors="coerce").dt.date
+        df["period_start"] = pd.to_datetime(df["period_start"], errors="coerce").dt.date
+        df["period_end"] = pd.to_datetime(df["period_end"], errors="coerce").dt.date
         df = df.dropna(subset=["period_start", "period_end"])
         if df.empty:
             return empty
@@ -885,8 +942,7 @@ def get_disposition_securities_period(stock_id):
             ((df["period_start"] <= today) & (today <= df["period_end"]))
             | ((df["period_start"] <= tomorrow) & (tomorrow <= df["period_end"]))
         )
-        active = df.loc[mask].sort_values(
-            ["period_end", "period_start"], ascending=[False, False])
+        active = df.loc[mask].sort_values(["period_end", "period_start"], ascending=[False, False])
         if active.empty:
             return empty
 
@@ -902,3 +958,4 @@ def get_disposition_securities_period(stock_id):
     except Exception as e:
         print(f"❌ disposition period error {stock_id}: {e}")
         return empty
+
