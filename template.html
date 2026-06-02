@@ -531,7 +531,7 @@
       <div class="filter-title-row">
         <div class="filter-title">篩選條件：可多條件累積篩選；輸入即時更新，也可按「套用」。</div>
         <div class="code-filter-item">
-          <label for="stockCodeFilter">股票代碼</label>
+          <label for="stockCodeFilter">股票代號</label>
           <input id="stockCodeFilter" type="text" inputmode="numeric" placeholder="例如 2330">
         </div>
       </div>
@@ -647,10 +647,13 @@
         ]
       },
       fundamental: {
-        note: "基本面：EPS、營收、毛利率、營益率、淨利率、殖利率、PER/PBR",
+        note: "基本面：籌碼、EPS、營收、毛利率、營益率、淨利率、殖利率、PER/PBR",
         columns: [
           { key: "code", label: "代碼<br><small>名稱</small>" },
           { key: "price", label: "價格<br><small>60天LH</small>" },
+          { key: "chip_concentration_score", label: "籌碼集中%<br><small>3天趨勢</small>" },
+          { key: "main_force_score", label: "主力買賣超<br><small>3天趨勢</small>" },
+          { key: "broker_diff", label: "買賣家數差<br><small>趨勢</small>" },
           { key: "eps_Y", label: "EPS<br><small>TTM</small>" },
           { key: "rev", label: "營收(bn)<br><small>M / Q / Y</small>" },
           { key: "gross_margin", label: "毛利率%<br><small>QoQ / YoY</small>" },
@@ -913,6 +916,9 @@
 
       const fundamentalGrid = `
         <div class="stock-grid">
+          <div class="stock-item"><div class="stock-label">籌碼集中% 3天趨勢</div>${renderChipConcentrationBlock(s)}</div>
+          <div class="stock-item"><div class="stock-label">主力買賣超 3天趨勢</div>${renderMainForceBlock(s)}</div>
+          <div class="stock-item"><div class="stock-label">買賣家數差 趨勢</div>${renderBrokerDiffBlock(s)}</div>
           <div class="stock-item"><div class="stock-label">EPS / TTM</div><div class="stock-value"><div class="table-lv1">${fmt(s.eps_Y)}</div><div class="table-lv2">${fmt(s.eps_ttm)}</div></div></div>
           <div class="stock-item"><div class="stock-label">營收</div><div class="stock-value">${renderMetric3(s.rev, s.rev_mom, s.rev_qoq, s.rev_yoy)}</div></div>
           <div class="stock-item"><div class="stock-label">毛利率</div><div class="stock-value">${renderMetric3(s.gross_margin, null, s.gross_margin_qoq, s.gross_margin_yoy_diff)}</div></div>
