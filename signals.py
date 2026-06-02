@@ -11,81 +11,120 @@ def _num(x):
         return None
 
 
-def _normalize_reason_text(text):
-    """Normalize reason text so duplicated wording can be removed safely."""
-    return ' '.join(str(text or '').replace('。', '').replace('，', ',').split())
-
-
-def _dedupe_reasons(reasons):
-    """Keep reason order, remove duplicates and obvious repeated neutral chip notes."""
-    result = []
-    seen = set()
-    for reason in reasons or []:
-        text = str(reason or '').strip()
-        if not text:
-            continue
-        key = _normalize_reason_text(text)
-        if key in seen:
-            continue
-        seen.add(key)
-        result.append(text)
-    return result
-
-
-def _join_reasons(reasons, empty='方向尚未明確'):
-    clean = _dedupe_reasons(reasons)
-    return ' / '.join(clean) if clean else empty
+def _join_reasons(reasons):
+    return ' / '.join([r for r in reasons if r]) if reasons else '訊號尚未明確'
 
 
 def _format_signal_sections(tech_reasons, chip_reasons):
-    """Output signal analysis as two separated sections for HTML rendering."""
-    tech_text = _join_reasons(tech_reasons, empty='資料不足')
-    chip_text = _join_reasons(chip_reasons, empty='方向尚未明確')
-    return f'技術面：{tech_text}\n籌碼面：{chip_text}'
+    """Build message text in two sections for downstream display."""
+    tech_text = _join_reasons(tech_reasons)
+    chip_text = _join_reasons(chip_reasons)
+    return f"技術面：{tech_text}\n籌碼面：{chip_text}"
 
 
+def _calc_chip_scenario(
+    main_buy_days=None,
+    main_sell_days=None,
+    main_net_3d=None,
+    price_up=False,
+    price_down=False,
+    price_flat=False,
+    volume_up=False,
+    price_volume_state=None,
+    position_zone=None,
+    close_position=None,
+):
+    """Classify 3-day main-force chip scenario.
 
-_OUTPUT_REPLACEMENTS = {
-    '觀察再賣出': '風險升高',
-    '觀察再買進': '轉強追蹤',
-    '等待觀察': '方向尚未明確',
-    '買進': '轉強',
-    '賣出': '調節',
-    '偏多': '轉強',
-    '偏空': '轉弱',
-    '中性': '震盪',
-    '訊號尚未明確': '方向尚未明確',
-}
-
-
-def _clean_output_text(text):
-    """Clean public signal text.
-
-    Keep only analysis content for 技術 / 籌碼 / 結論, and remove action labels
-    or bias words that should not appear in the HTML output.
+    Returns scenario / bias / description. The wording avoids trade-action
+    conclusions and is intended for the B)籌碼面段落.
     """
-    if text is None:
-        return ''
-    value = str(text)
-    for old, new in _OUTPUT_REPLACEMENTS.items():
-        value = value.replace(old, new)
-    # Normalize duplicated separators and whitespace without removing newlines.
-    lines = []
-    for line in value.splitlines():
-        line = ' '.join(line.strip().split())
-        if line:
-            lines.append(line)
-    value = '\n'.join(lines)
-    while ' / / ' in value:
-        value = value.replace(' / / ', ' / ')
-    return value.strip(' /')
+    try:
+        main_buy_days = int(main_buy_days) if main_buy_days is not None else 0
+    except Exception:
+        main_buy_days = 0
+    try:
+        main_sell_days = int(main_sell_days) if main_sell_days is not None else 0
+    except Exception:
+        main_sell_days = 0
+
+    main_net_3d = _num(main_net_3d)
+    price_volume_state = price_volume_state or ''
+    zone_text = str(close_position or position_zone or '')
+
+    high_zone = ('高檔' in zone_text) or ('頂部' in zone_text)
+    low_zone = ('低檔' in zone_text) or ('底部' in zone_text)
+    range_or_flat = bool(price_flat) or price_volume_state in ('價平量增', '價平量縮', '價量中性')
+    price_up_or_high_range = bool(price_up) or (high_zone and range_or_flat)
+    volume_expanding = bool(volume_up) or price_volume_state in ('價漲量增', '價跌量增', '價平量增')
+
+    if high_zone and main_sell_days >= 2:
+        return {
+            'scenario': '高檔主力賣',
+            'bias': '偏空',
+            'description': '高檔區搭配主力連續賣超，籌碼風險較高。',
+        }
+    if low_zone and main_buy_days >= 2:
+        return {
+            'scenario': '低檔主力買',
+            'bias': '偏多',
+            'description': '低檔區搭配主力連續買超，後續有轉強機會。',
+        }
+    if main_buy_days >= 2 and price_up and volume_expanding:
+        return {
+            'scenario': '主力進場攻擊',
+            'bias': '偏多',
+            'description': '主力連續買超，股價上漲且成交量放大，短線有續攻機會。',
+        }
+    if main_buy_days >= 2 and (price_down or range_or_flat):
+        return {
+            'scenario': '主力低接吸籌',
+            'bias': '偏多',
+            'description': '主力連續買超，但股價小跌或盤整，可能在壓盤吃貨。',
+        }
+    if main_sell_days >= 1 and price_up_or_high_range:
+        return {
+            'scenario': '主力拉高出貨',
+            'bias': '偏空',
+            'description': '主力轉賣，但股價仍上漲或高檔震盪，留意隔日反轉風險。',
+        }
+    if main_sell_days >= 2 and price_down and volume_expanding:
+        return {
+            'scenario': '主力倒貨下殺',
+            'bias': '偏空',
+            'description': '主力連續賣超，股價下跌且成交量放大，短線弱勢。',
+        }
+    if price_up and main_net_3d is not None and main_net_3d < 0:
+        return {
+            'scenario': '價漲籌碼不跟',
+            'bias': '中性偏空',
+            'description': '股價上漲但主力淨賣超，可能是散戶追價。',
+        }
+    if price_down and main_net_3d is not None and main_net_3d > 0:
+        return {
+            'scenario': '價跌主力買',
+            'bias': '中性偏多',
+            'description': '股價下跌但主力淨買超，可能是洗盤或承接。',
+        }
+    if (main_net_3d is None or abs(main_net_3d) == 0 or (main_buy_days > 0 and main_sell_days > 0)) and range_or_flat:
+        return {
+            'scenario': '籌碼混亂',
+            'bias': '中性',
+            'description': '主力買賣互抵且價格無明確方向。',
+        }
+    return {
+        'scenario': '籌碼震盪',
+        'bias': '中性',
+        'description': '籌碼震盪，方向未定。',
+    }
+
 
 def _calc_price_volume_state(chgPct, amp, volume, prev_volume, prev2_volume, volume_ok=None):
     """
     價量關係：
-    - 價漲量增：轉強，底部/上漲途中較有利
+    - 價漲量增：偏多，底部/上漲途中較有利
     - 價漲量縮：可能反彈或追價力道不足
-    - 價跌量增：轉弱，頂部/下跌途中較危險
+    - 價跌量增：偏空，頂部/下跌途中較危險
     - 價跌量縮：跌勢趨緩，底部區可觀察是否止穩
     - 價平量增：多空換手，需看位階
     - 價平量縮：盤整
@@ -134,7 +173,7 @@ def _calc_price_volume_state(chgPct, amp, volume, prev_volume, prev2_volume, vol
     elif price_flat and volume_down:
         state = '價平量縮'
     else:
-        state = '價量震盪'
+        state = '價量中性'
 
     return {
         'state': state,
@@ -221,7 +260,7 @@ def _calc_position_zone(
     }
 
 
-def _get_tech_signal_impl(
+def get_tech_signal(
     close,
     chgPct,
     amp,
@@ -255,7 +294,6 @@ def _get_tech_signal_impl(
     prev_ma50=None,
     macd_hist=None,
     prev_macd_hist=None,
-    # 籌碼面選填欄位；沒有傳入時仍維持原本技術面判斷。
     chip_signal_state=None,
     chip_signal_text=None,
     chip_concentration_score=None,
@@ -264,6 +302,16 @@ def _get_tech_signal_impl(
     chip_concentration_pct=None,
     chip_trend_days=None,
     chip_concentration_threshold=None,
+    # 三日籌碼情境判斷欄位；沒有傳入時仍維持原本籌碼分數邏輯。
+    main_buy_days=None,
+    main_sell_days=None,
+    main_net_3d=None,
+    avg_volume_3d=None,
+    price_change_3d=None,
+    volume_change_3d=None,
+    close_position=None,
+    repeat_buy_brokers=None,
+    repeat_sell_brokers=None,
 ):
     """
     技術訊號主邏輯。
@@ -273,7 +321,7 @@ def _get_tech_signal_impl(
     2. 再判斷「價量關係」：價漲量增 / 價漲量縮 / 價跌量增 / 價跌量縮 / 價平量增 / 價平量縮
     3. 最後才用 KD、月線、布林、乖離、MACD 輔助確認買賣訊號
     4. 避免「剛進入上漲途中」卻因 KD 高檔或短線拉回而過早調節
-    5. 下跌途中低接只給觀察，不在未止跌前直接轉強或重壓
+    5. 下跌途中低接只給觀察，不在未止跌前直接買進或重壓
     """
     reasons = []
     chip_reasons = []
@@ -303,12 +351,18 @@ def _get_tech_signal_impl(
     except Exception:
         chip_trend_days = None
     chip_concentration_threshold = _num(chip_concentration_threshold)
+    main_net_3d = _num(main_net_3d)
+    avg_volume_3d = _num(avg_volume_3d)
+    price_change_3d = _num(price_change_3d)
+    volume_change_3d = _num(volume_change_3d)
+    repeat_buy_brokers = _num(repeat_buy_brokers)
+    repeat_sell_brokers = _num(repeat_sell_brokers)
 
     if close is None:
         return {
-            'signal': '',
+            'signal': '中性',
             'reason': '缺少收盤價資料',
-            'signal_text': '技術面：資料不足\n籌碼面：方向尚未明確',
+            'signal_text': '技術面：資料不足\n籌碼面：訊號尚未明確',
         }
 
     # === KD 判斷 ===
@@ -473,7 +527,7 @@ def _get_tech_signal_impl(
     if volume_shrink:
         reasons.append('明顯量縮')
 
-    # === 籌碼面判斷：只放 chip_reasons，不混入技術面 reasons ===
+    # === 籌碼判斷 ===
     chip_state = str(chip_signal_state or '').strip()
     chip_days_text = f"{chip_trend_days}天" if chip_trend_days else "多日"
     chip_threshold_text = (
@@ -481,19 +535,21 @@ def _get_tech_signal_impl(
         if chip_concentration_threshold is not None else ""
     )
 
+    chip_bullish_concentrated = chip_state == 'bullish_concentrated'
+    chip_bullish_distributed = chip_state == 'bullish_distributed'
+    chip_bearish_distributed = chip_state == 'bearish_distributed'
+    chip_bearish = chip_state in ('bearish', 'bearish_distributed')
+
     if chip_signal_text:
-        # 先採用資料來源的主要籌碼描述，但避免下方再塞入重複句。
         chip_reasons.append(str(chip_signal_text))
-    elif chip_state == 'bullish_concentrated':
-        chip_reasons.append(f'籌碼{chip_days_text}集中轉強{chip_threshold_text}')
-    elif chip_state == 'bullish_distributed':
+    elif chip_bullish_concentrated:
+        chip_reasons.append(f'籌碼{chip_days_text}集中偏多{chip_threshold_text}')
+    elif chip_bullish_distributed:
         chip_reasons.append(f'主力{chip_days_text}買超但籌碼偏分散')
-    elif chip_state == 'bearish_distributed':
+    elif chip_bearish_distributed:
         chip_reasons.append(f'主力{chip_days_text}賣超且籌碼流向散戶')
-    elif chip_state == 'bearish':
+    elif chip_bearish:
         chip_reasons.append(f'主力{chip_days_text}賣超')
-    elif chip_state in ('no_data', 'error'):
-        chip_reasons.append('籌碼資料不足')
 
     if chip_concentration_score is not None and chip_concentration_score > 0:
         chip_reasons.append('籌碼集中趨勢轉強')
@@ -501,22 +557,14 @@ def _get_tech_signal_impl(
         chip_reasons.append('籌碼集中趨勢轉弱')
 
     if main_force_score is not None and main_force_score > 0:
-        chip_reasons.append('主力買超趨勢轉強')
+        chip_reasons.append('主力買超趨勢偏多')
     elif main_force_score is not None and main_force_score < 0:
-        chip_reasons.append('主力買超趨勢轉弱')
+        chip_reasons.append('主力買超趨勢偏空')
 
     if broker_diff_score is not None and broker_diff_score < 0:
         chip_reasons.append('買賣家數差收斂')
     elif broker_diff_score is not None and broker_diff_score > 0:
         chip_reasons.append('買賣家數差擴散')
-
-    # 避免同一段同時出現「主力連買/賣」與「籌碼震盪」造成衝突。
-    strong_chip_state = chip_state in {'bullish_concentrated', 'bullish_distributed', 'bearish_distributed', 'bearish'}
-    if strong_chip_state:
-        chip_reasons = [
-            r for r in chip_reasons
-            if not (('籌碼震盪' in str(r) or '籌碼混亂' in str(r)) and str(r) != str(chip_signal_text or ''))
-        ]
 
     # === 位階判斷 ===
     zone_info = _calc_position_zone(
@@ -553,16 +601,36 @@ def _get_tech_signal_impl(
     elif bb_high:
         reasons.append('位於布林高檔區')
     elif bb_mid:
-        reasons.append('布林位於震盪偏強區')
+        reasons.append('布林位於中性偏強區')
 
     if bb_overheat:
         reasons.append('接近布林上緣過熱')
+
+    chip_scenario = _calc_chip_scenario(
+        main_buy_days=main_buy_days,
+        main_sell_days=main_sell_days,
+        main_net_3d=main_net_3d,
+        price_up=price_up,
+        price_down=price_down,
+        price_flat=pv['price_flat'],
+        volume_up=volume_up,
+        price_volume_state=price_volume_state,
+        position_zone=position_zone,
+        close_position=close_position,
+    )
+    chip_reasons.append(
+        f"{chip_scenario['scenario']}（{chip_scenario['bias']}）：{chip_scenario['description']}"
+    )
+    if repeat_buy_brokers is not None and repeat_buy_brokers >= 3:
+        chip_reasons.append('三日重複買超券商增加，主力承接連續性較佳')
+    if repeat_sell_brokers is not None and repeat_sell_brokers >= 3:
+        chip_reasons.append('三日重複賣超券商增加，主力調節連續性較高')
 
     # === 強弱輔助條件 ===
     kd_strong = kd_gold_cross or kd_turn_strong or k_trend_up
     kd_weak = kd_dead_cross or kd_turn_weak or k_trend_down
     trend_supported = above_ma18 and (ma18_up or ma50_up or above_ma50 or ma18_break)
-    early_uptrend = ma18_break and kd_strong and price_volume_state in ('價漲量增', '價平量增', '價量震盪')
+    early_uptrend = ma18_break and kd_strong and price_volume_state in ('價漲量增', '價平量增', '價量中性')
     main_uptrend = position_zone == '上漲途中' and trend_supported and not ma18_fall_break
     overheat_confirmed = bb_overheat or (bb_high and bias_high_zone) or (bias_high_zone and kd_high)
     trend_break_confirmed = ma18_fall_break or (below_ma18 and kd_weak)
@@ -571,22 +639,60 @@ def _get_tech_signal_impl(
     # 規則判斷：位階 × 價量 × 技術確認
     # ============================================================
 
-    # 1) 起漲保護：聯發科 2454 類型，剛站回月線 + 價量/KD轉強，不因短線高檔或剛獲利而賣。
+    # 0) 籌碼優先警示：主力賣、家數擴散，若股價走弱或放量下跌，風險優先。
+    if (
+        chip_bearish_distributed
+        and (price_down or price_volume_state in ('價跌量增', '價平量增'))
+        and (kd_weak or trend_break_confirmed or position_zone in ('頂部區域', '下跌途中'))
+    ):
+        return {
+            'signal': '偏空',
+            'reason': '主力連續賣超且買賣家數差擴散，搭配股價轉弱，籌碼流向散戶風險高',
+            'signal_text': _format_signal_sections(reasons, chip_reasons),
+        }
+
+    # 0-1) 主力連買但家數擴散：虛胖型上漲，不追高。
+    if (
+        chip_bullish_distributed
+        and price_up
+        and (bb_high or bias_high_zone or volume_spike)
+    ):
+        return {
+            'signal': '偏空' if position_zone == '頂部區域' else '中性',
+            'reason': '雖有主力買超，但買賣家數差擴散，屬偏分散的虛胖型上漲，避免追高',
+            'signal_text': _format_signal_sections(reasons, chip_reasons),
+        }
+
+    # 0-2) 籌碼集中偏多：低調吸籌或起漲初期，給偏多觀察/買進。
+    if (
+        chip_bullish_concentrated
+        and not overheat_confirmed
+        and not trend_break_confirmed
+        and price_volume_state in ('價漲量增', '價平量增', '價量中性', '價漲量縮')
+        and (kd_strong or trend_supported or position_zone in ('底部區域', '上漲途中', '盤整區域'))
+    ):
+        return {
+            'signal': '偏多',
+            'reason': '主力買超且買賣家數差收斂，籌碼集中偏多，可跟隨低佈局但避免追高',
+            'signal_text': _format_signal_sections(reasons, chip_reasons),
+        }
+
+    # 1) 起漲保護：聯發科 2454 類型，剛站回月線 + 價量/KD轉強，不因短線高檔或剛獲利而調節。
     if early_uptrend:
         return {
-            'signal': '轉強追蹤',
+            'signal': '偏多',
             'reason': '剛突破月線且價量/KD轉強，屬起漲或轉強初期，持股不宜過早調節',
             'signal_text': _format_signal_sections(reasons, chip_reasons),
         }
 
-    # 2) 明確調節：高檔過熱後價跌量增，或已跌破月線，才直接調節。
+    # 2) 明確調節：高檔過熱後價跌量增，或已跌破月線，才直接轉空。
     if (
         price_volume_state == '價跌量增'
         and (overheat_confirmed or position_zone == '下跌途中' or trend_break_confirmed)
         and (kd_weak or trend_break_confirmed or macd_turn_negative)
     ):
         return {
-            'signal': '調節',
+            'signal': '偏空',
             'reason': '高檔過熱或下跌途中出現價跌量增，且動能/均線轉弱',
             'signal_text': _format_signal_sections(reasons, chip_reasons),
         }
@@ -599,7 +705,7 @@ def _get_tech_signal_impl(
         and (kd_weak or macd_turn_negative)
     ):
         return {
-            'signal': '調節',
+            'signal': '偏空',
             'reason': '連續放量下跌並跌破月線，轉弱訊號明確',
             'signal_text': _format_signal_sections(reasons, chip_reasons),
         }
@@ -612,7 +718,7 @@ def _get_tech_signal_impl(
         and not ma18_fall_break
     ):
         return {
-            'signal': '風險升高',
+            'signal': '偏空',
             'reason': '高檔過熱且動能降溫，但尚未跌破月線，宜分批停利而非一次出清',
             'signal_text': _format_signal_sections(reasons, chip_reasons),
         }
@@ -620,16 +726,16 @@ def _get_tech_signal_impl(
     # 5) 主升段保護：月線上方、趨勢仍受支撐，KD高檔或短線降溫不視為調節。
     if (
         main_uptrend
-        and price_volume_state in ('價漲量增', '價漲量縮', '價平量增', '價量震盪')
+        and price_volume_state in ('價漲量增', '價漲量縮', '價平量增', '價量中性')
         and not overheat_confirmed
     ):
         return {
-            'signal': '',
+            'signal': '偏多' if price_volume_state in ('價漲量增', '價平量增') and kd_strong else '中性',
             'reason': '股價仍在上漲途中且月線趨勢未破，持股以續抱觀察為主，不因KD高檔過早調節',
             'signal_text': _format_signal_sections(reasons, chip_reasons),
         }
 
-    # 6) 上漲途中放量下跌：提高警戒，但未跌破月線前不直接調節。
+    # 6) 上漲途中放量下跌：提高警戒，但未跌破月線前不直接轉空。
     if (
         main_uptrend
         and price_volume_state == '價跌量增'
@@ -637,7 +743,7 @@ def _get_tech_signal_impl(
         and not ma18_fall_break
     ):
         return {
-            'signal': '風險升高',
+            'signal': '偏空',
             'reason': '上漲途中出現價跌量增與動能轉弱，若跌破月線應降低持股',
             'signal_text': _format_signal_sections(reasons, chip_reasons),
         }
@@ -646,15 +752,15 @@ def _get_tech_signal_impl(
     if (
         position_zone == '下跌途中'
         and not early_uptrend
-        and price_volume_state in ('價漲量縮', '價跌量縮', '價平量縮', '價量震盪')
+        and price_volume_state in ('價漲量縮', '價跌量縮', '價平量縮', '價量中性')
     ):
         return {
-            'signal': '',
+            'signal': '中性',
             'reason': '仍在下跌途中，反彈或量縮尚不足以確認轉強',
             'signal_text': _format_signal_sections(reasons, chip_reasons),
         }
 
-    # 8) 底部轉強：底部區 + 價漲量增 + KD/MACD改善；先轉強追蹤，避免一次重壓。
+    # 8) 底部轉強：底部區 + 價漲量增 + KD/MACD改善；偏多但避免一次重壓。
     if (
         position_zone == '底部區域'
         and price_volume_state == '價漲量增'
@@ -662,7 +768,7 @@ def _get_tech_signal_impl(
         and not ma18_fall_break
     ):
         return {
-            'signal': '轉強追蹤',
+            'signal': '偏多',
             'reason': '底部區域出現價漲量增與動能改善，可觀察低檔轉強，但宜分批不宜重壓',
             'signal_text': _format_signal_sections(reasons, chip_reasons),
         }
@@ -674,12 +780,12 @@ def _get_tech_signal_impl(
         and (kd_turn_strong or k_trend_up or kd_low or volume_shrink)
     ):
         return {
-            'signal': '',
+            'signal': '中性',
             'reason': '底部區域跌勢趨緩，但尚未出現明確價漲量增，先觀察止穩',
             'signal_text': _format_signal_sections(reasons, chip_reasons),
         }
 
-    # 10) 明確轉強：突破或站上月線，價漲量增，KD/MACD轉強，且未明顯過熱。
+    # 10) 明確買進：突破或站上月線，價漲量增，KD/MACD轉強，且未明顯過熱。
     if (
         price_volume_state == '價漲量增'
         and (kd_strong or macd_turn_positive or macd_improving)
@@ -688,8 +794,8 @@ def _get_tech_signal_impl(
         and not bias_high_zone
     ):
         return {
-            'signal': '轉強',
-            'reason': '價漲量增，動能轉強，股價站上月線，技術面轉強',
+            'signal': '偏多',
+            'reason': '價漲量增，動能轉強，股價站上月線，技術面偏多',
             'signal_text': _format_signal_sections(reasons, chip_reasons),
         }
 
@@ -701,7 +807,7 @@ def _get_tech_signal_impl(
         and not ma18_fall_break
     ):
         return {
-            'signal': '',
+            'signal': '中性',
             'reason': '上漲途中出現價漲量縮，持股可觀察但不宜追高',
             'signal_text': _format_signal_sections(reasons, chip_reasons),
         }
@@ -711,11 +817,11 @@ def _get_tech_signal_impl(
         position_zone == '上漲途中'
         and above_ma18
         and kd_weak
-        and price_volume_state in ('價漲量縮', '價平量增', '價量震盪')
+        and price_volume_state in ('價漲量縮', '價平量增', '價量中性')
         and not ma18_fall_break
     ):
         return {
-            'signal': '',
+            'signal': '中性',
             'reason': '上漲途中動能轉弱但尚未跌破月線，先觀察不急賣',
             'signal_text': _format_signal_sections(reasons, chip_reasons),
         }
@@ -723,31 +829,17 @@ def _get_tech_signal_impl(
     # 13) 盤整區：價平量縮或訊號混雜。
     if (
         position_zone == '盤整區域'
-        or price_volume_state in ('價平量縮', '價量震盪')
+        or price_volume_state in ('價平量縮', '價量中性')
     ):
         return {
-            'signal': '',
-            'reason': '位階與價量尚未形成明確方向，等待突破或跌破確認',
+            'signal': '中性',
+            'reason': '位階與價量尚未形成明確方向，留意突破或跌破確認',
             'signal_text': _format_signal_sections(reasons, chip_reasons),
         }
 
     # 14) 保守預設。
     return {
-        'signal': '',
+        'signal': '中性',
         'reason': '價格、量能、KD與布林尚未形成明確方向',
         'signal_text': _format_signal_sections(reasons, chip_reasons),
     }
-
-
-
-def get_tech_signal(*args, **kwargs):
-    """Public wrapper: keep 技術/籌碼/結論, but do not output action/bias labels."""
-    result = _get_tech_signal_impl(*args, **kwargs)
-    if not isinstance(result, dict):
-        return result
-    result = dict(result)
-    # Do not expose action or bias labels in HTML.
-    result['signal'] = ''
-    result['reason'] = _clean_output_text(result.get('reason', ''))
-    result['signal_text'] = _clean_output_text(result.get('signal_text', ''))
-    return result
