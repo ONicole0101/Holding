@@ -203,6 +203,29 @@
       gap: 4px;
     }
 
+
+    .signal-text {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .signal-section {
+      line-height: 1.45;
+      white-space: normal;
+    }
+
+    .signal-section-title {
+      color: #c9d1d9;
+      font-weight: bold;
+    }
+
+    .signal-conclusion {
+      margin-top: 2px;
+      line-height: 1.45;
+      white-space: normal;
+    }
+
     .summary {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -605,6 +628,18 @@
           <option value=">">&gt;</option>
           <option value="<">&lt;</option>
         </select><input data-filter-key="volume_ratio" type="number" step="0.01" placeholder="數值"></div>
+      <div class="filter-item"><label>籌碼集中%</label><select data-filter-op="chip_concentration_pct_filter">
+          <option value=">">&gt;</option>
+          <option value="<">&lt;</option>
+        </select><input data-filter-key="chip_concentration_pct_filter" type="number" step="0.01" placeholder="%"></div>
+      <div class="filter-item"><label>主力買賣超</label><select data-filter-op="main_force_net_filter">
+          <option value=">">&gt;</option>
+          <option value="<">&lt;</option>
+        </select><input data-filter-key="main_force_net_filter" type="number" step="1" placeholder="張數"></div>
+      <div class="filter-item"><label>買賣家數差</label><select data-filter-op="broker_diff_filter">
+          <option value=">">&gt;</option>
+          <option value="<">&lt;</option>
+        </select><input data-filter-key="broker_diff_filter" type="number" step="1" placeholder="家數"></div>
       <div class="filter-actions">
         <button type="button" id="applyFilterBtn">套用</button>
         <button type="button" class="secondary" id="clearFilterBtn">清除</button>
@@ -684,7 +719,7 @@
         ]
       },
       signal: {
-        note: "訊號：買賣觀察、籌碼表現、訊號文字、進場提示、原因",
+        note: "訊號：買賣觀察、訊號文字、進場提示、原因",
         columns: [
           { key: "code", label: "代碼<br><small>名稱</small>" },
           { key: "price", label: "價格<br><small>60天LH</small>" },
@@ -781,13 +816,9 @@
     }
 
 
-    function chipDaysLabel(s) {
-      const days = Number(s.chip_trend_days ?? 3);
-      return Number.isFinite(days) && days > 0 ? `${days}天` : "3天";
-    }
-
-    function chipThresholdLabel(s) {
-      return isNil(s.chip_concentration_threshold) ? "-" : `${fmt(s.chip_concentration_threshold, "%")}`;
+    function chipDateMMDD(dateText, fallback = "") {
+      const value = fmtMonthDay(dateText);
+      return value ? value.replace("/", "") : fallback;
     }
 
     function chipValueClass(current, previous) {
@@ -800,9 +831,11 @@
       return "";
     }
 
-    function chipDateMMDD(dateText, fallback = "") {
-      const value = fmtMonthDay(dateText);
-      return value ? value.replace("/", "") : fallback;
+    function pickFirst(...values) {
+      for (const value of values) {
+        if (!isNil(value) && value !== "") return value;
+      }
+      return null;
     }
 
     function chipLine(dateText, value, previousValue, suffix = "", unit = "", small = false, fallbackLabel = "") {
@@ -818,7 +851,7 @@
         <td>
           <div class="chip-detail">
             <div class="chip-arrow ${trendClass(s.chip_concentration_score)}">${isNil(s.chip_concentration_score) ? "-" : fmtTrend(s.chip_concentration_score)}</div>
-            ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, s.chip_concentration_pct_t0 ?? s.chip_concentration_pct, s.chip_concentration_pct_t1, "%", "", false, "今日")}
+            ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, pickFirst(s.chip_concentration_pct_t0, s.chip_concentration_pct), s.chip_concentration_pct_t1, "%", "", false, "今日")}
             ${chipLine(s.chip_date_t1, s.chip_concentration_pct_t1, s.chip_concentration_pct_t2, "%", "", true, "T-1")}
             ${chipLine(s.chip_date_t2, s.chip_concentration_pct_t2, undefined, "%", "", true, "T-2")}
           </div>
@@ -830,9 +863,9 @@
         <td>
           <div class="chip-detail">
             <div class="chip-arrow ${trendClass(s.main_force_score)}">${isNil(s.main_force_score) ? "-" : fmtTrend(s.main_force_score)}</div>
-            ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, s.main_force_net_t0 ?? s.main_force_net, s.main_force_net_t1, "", "張", false, "今日")}
-            ${chipLine(s.chip_date_t1, s.main_force_net_t1, s.main_force_net_t2, "", "張", false, "T-1")}
-            ${chipLine(s.chip_date_t2, s.main_force_net_t2, undefined, "", "張", false, "T-2")}
+            ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, pickFirst(s.main_force_net_t0, s.main_force_net), s.main_force_net_t1, "", "張", false, "今日")}
+            ${chipLine(s.chip_date_t1, s.main_force_net_t1, s.main_force_net_t2, "", "張", true, "T-1")}
+            ${chipLine(s.chip_date_t2, s.main_force_net_t2, undefined, "", "張", true, "T-2")}
           </div>
         </td>`;
     }
@@ -842,41 +875,38 @@
         <td>
           <div class="chip-detail">
             <div class="chip-arrow ${trendClass(s.broker_diff_score)}">${isNil(s.broker_diff_score) ? "-" : fmtTrend(s.broker_diff_score)}</div>
-            ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, s.broker_diff_t0 ?? s.broker_diff, s.broker_diff_t1, "", "家", false, "今日")}
-            ${chipLine(s.chip_date_t1, s.broker_diff_t1, s.broker_diff_t2, "", "家", false, "T-1")}
-            ${chipLine(s.chip_date_t2, s.broker_diff_t2, undefined, "", "家", false, "T-2")}
+            ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, pickFirst(s.broker_diff_t0, s.broker_diff), s.broker_diff_t1, "", "家", false, "今日")}
+            ${chipLine(s.chip_date_t1, s.broker_diff_t1, s.broker_diff_t2, "", "家", true, "T-1")}
+            ${chipLine(s.chip_date_t2, s.broker_diff_t2, undefined, "", "家", true, "T-2")}
           </div>
         </td>`;
     }
 
     function renderChipConcentrationBlock(s) {
-      return `
-        <div class="stock-value">
-          <div class="chip-arrow ${trendClass(s.chip_concentration_score)}">${isNil(s.chip_concentration_score) ? "-" : fmtTrend(s.chip_concentration_score)}</div>
-          ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, s.chip_concentration_pct_t0 ?? s.chip_concentration_pct, s.chip_concentration_pct_t1, "%", "", false, "今日")}
-          ${chipLine(s.chip_date_t1, s.chip_concentration_pct_t1, s.chip_concentration_pct_t2, "%", "", true, "T-1")}
-          ${chipLine(s.chip_date_t2, s.chip_concentration_pct_t2, undefined, "%", "", true, "T-2")}
-        </div>`;
+      return `<div class="stock-value">
+        <div class="chip-arrow ${trendClass(s.chip_concentration_score)}">${isNil(s.chip_concentration_score) ? "-" : fmtTrend(s.chip_concentration_score)}</div>
+        ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, pickFirst(s.chip_concentration_pct_t0, s.chip_concentration_pct), s.chip_concentration_pct_t1, "%", "", false, "今日")}
+        ${chipLine(s.chip_date_t1, s.chip_concentration_pct_t1, s.chip_concentration_pct_t2, "%", "", true, "T-1")}
+        ${chipLine(s.chip_date_t2, s.chip_concentration_pct_t2, undefined, "%", "", true, "T-2")}
+      </div>`;
     }
 
     function renderMainForceBlock(s) {
-      return `
-        <div class="stock-value">
-          <div class="chip-arrow ${trendClass(s.main_force_score)}">${isNil(s.main_force_score) ? "-" : fmtTrend(s.main_force_score)}</div>
-          ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, s.main_force_net_t0 ?? s.main_force_net, s.main_force_net_t1, "", "張", false, "今日")}
-          ${chipLine(s.chip_date_t1, s.main_force_net_t1, s.main_force_net_t2, "", "張", false, "T-1")}
-          ${chipLine(s.chip_date_t2, s.main_force_net_t2, undefined, "", "張", false, "T-2")}
-        </div>`;
+      return `<div class="stock-value">
+        <div class="chip-arrow ${trendClass(s.main_force_score)}">${isNil(s.main_force_score) ? "-" : fmtTrend(s.main_force_score)}</div>
+        ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, pickFirst(s.main_force_net_t0, s.main_force_net), s.main_force_net_t1, "", "張", false, "今日")}
+        ${chipLine(s.chip_date_t1, s.main_force_net_t1, s.main_force_net_t2, "", "張", true, "T-1")}
+        ${chipLine(s.chip_date_t2, s.main_force_net_t2, undefined, "", "張", true, "T-2")}
+      </div>`;
     }
 
     function renderBrokerDiffBlock(s) {
-      return `
-        <div class="stock-value">
-          <div class="chip-arrow ${trendClass(s.broker_diff_score)}">${isNil(s.broker_diff_score) ? "-" : fmtTrend(s.broker_diff_score)}</div>
-          ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, s.broker_diff_t0 ?? s.broker_diff, s.broker_diff_t1, "", "家", false, "今日")}
-          ${chipLine(s.chip_date_t1, s.broker_diff_t1, s.broker_diff_t2, "", "家", false, "T-1")}
-          ${chipLine(s.chip_date_t2, s.broker_diff_t2, undefined, "", "家", false, "T-2")}
-        </div>`;
+      return `<div class="stock-value">
+        <div class="chip-arrow ${trendClass(s.broker_diff_score)}">${isNil(s.broker_diff_score) ? "-" : fmtTrend(s.broker_diff_score)}</div>
+        ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, pickFirst(s.broker_diff_t0, s.broker_diff), s.broker_diff_t1, "", "家", false, "今日")}
+        ${chipLine(s.chip_date_t1, s.broker_diff_t1, s.broker_diff_t2, "", "家", true, "T-1")}
+        ${chipLine(s.chip_date_t2, s.broker_diff_t2, undefined, "", "家", true, "T-2")}
+      </div>`;
     }
 
     function dispositionPeriodText(s) {
@@ -909,14 +939,67 @@
         </td>`;
     }
 
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function cleanSignalOutput(value) {
+      let text = String(value ?? "");
+      const k = (...parts) => parts.join("");
+      const replacements = [
+        [k("觀察", "再", "賣", "出"), "風險升高"],
+        [k("觀察", "再", "買", "進"), "轉強追蹤"],
+        [k("等待", "觀察"), "方向尚未明確"],
+        [k("買", "進"), "轉強"],
+        [k("賣", "出"), "調節"],
+        [k("偏", "多"), "轉強"],
+        [k("偏", "空"), "轉弱"],
+        [k("中", "性"), "震盪"],
+        [k("訊號", "尚未", "明確"), "方向尚未明確"]
+      ];
+      replacements.forEach(([oldText, newText]) => {
+        text = text.split(oldText).join(newText);
+      });
+      return text.trim();
+    }
+
+    function renderSignalText(text) {
+      const cleaned = cleanSignalOutput(text);
+      if (!cleaned) return "";
+      const sections = { tech: "", chip: "", other: "" };
+      cleaned.split(/\n+/).forEach(line => {
+        const item = line.trim();
+        if (!item) return;
+        if (item.startsWith("技術面：")) sections.tech = item.replace(/^技術面：/, "");
+        else if (item.startsWith("技術：")) sections.tech = item.replace(/^技術：/, "");
+        else if (item.startsWith("籌碼面：")) sections.chip = item.replace(/^籌碼面：/, "");
+        else if (item.startsWith("籌碼：")) sections.chip = item.replace(/^籌碼：/, "");
+        else sections.other += (sections.other ? " / " : "") + item;
+      });
+      const blocks = [];
+      if (sections.tech) {
+        blocks.push(`<div class="signal-section signal-section-tech"><span class="signal-section-title">技術：</span>${escapeHtml(sections.tech)}</div>`);
+      }
+      if (sections.chip) {
+        blocks.push(`<div class="signal-section signal-section-chip"><span class="signal-section-title">籌碼：</span>${escapeHtml(sections.chip)}</div>`);
+      }
+      if (!sections.tech && !sections.chip && sections.other) {
+        blocks.push(`<div class="signal-section">${escapeHtml(sections.other)}</div>`);
+      }
+      return `<div class="table-lv2 signal-text">${blocks.join("")}</div>`;
+    }
+
     function renderSignalCell(s) {
       return `
         <td class="signal-cell">
           <div class="signal-wrap">
-            <div class="sig ${s.sig == 1 ? 'up' : s.sig == -1 ? 'dn' : 'watch'}">${s.signal ?? '等待觀察'}</div>
-            <div class="table-lv2">${s.signal_text ?? ""}</div>
-            <div class="table-lv2">${s.entry_note ? s.entry_note : ""}</div>
-            <div class="table-lv2">${s.reason ?? ""}</div>
+            ${renderSignalText(s.signal_text)}
+            ${s.entry_note ? `<div class="table-lv2">${escapeHtml(cleanSignalOutput(s.entry_note))}</div>` : ""}
           </div>
         </td>`;
     }
@@ -1038,9 +1121,9 @@
           <div class="stock-item"><div class="stock-label">日Bias18 LH</div><div class="stock-value">${renderRangeMetric(s.bias18, s.bias18_min, s.bias18_max, "%", distClass(s.bias18))}</div></div>
           <div class="stock-item"><div class="stock-label">日Bias50 LH</div><div class="stock-value">${renderRangeMetric(s.bias50, s.bias50_min, s.bias50_max, "%", distClass(s.bias50))}</div></div>
           <div class="stock-item"><div class="stock-label">量 / 昨 / 增 / 張</div><div class="stock-value"><div>${fmt(s.volume)} 張</div><div class="table-lv2">昨 ${fmt(s.prev_volume)}</div><div class="table-lv2 ${trendClass(s.volume_ratio)}">${isNil(s.volume_ratio) ? "-" : `${fmtTrend(s.volume_ratio)} ${fmt(s.volume_ratio, "%")}`}</div><div class="table-lv2">${isNil(s.volume_add) ? "-" : `${fmt(s.volume_add)} 張`}</div></div></div>
-          <div class="stock-item"><div class="stock-label">籌碼集中${chipDaysLabel(s)}趨勢</div>${renderChipConcentrationBlock(s)}</div>
-          <div class="stock-item"><div class="stock-label">主力買賣超${chipDaysLabel(s)}趨勢</div>${renderMainForceBlock(s)}</div>
-          <div class="stock-item"><div class="stock-label">買賣家數差</div>${renderBrokerDiffBlock(s)}</div>
+          <div class="stock-item"><div class="stock-label">籌碼集中% 3天趨勢</div>${renderChipConcentrationBlock(s)}</div>
+          <div class="stock-item"><div class="stock-label">主力買賣超 3天趨勢</div>${renderMainForceBlock(s)}</div>
+          <div class="stock-item"><div class="stock-label">買賣家數差 趨勢</div>${renderBrokerDiffBlock(s)}</div>
         </div>`;
 
       const fundamentalGrid = `
@@ -1065,10 +1148,8 @@
 
       const signalBlock = `
         <div class="stock-signal">
-          <span class="sig ${s.sig == 1 ? 'up' : s.sig == -1 ? 'dn' : 'watch'}">${s.signal ?? '等待觀察'}</span>
-          <div class="table-lv2">${s.signal_text ?? ""}</div>
-          <div class="table-lv2">${s.entry_note ?? ""}</div>
-          <div class="table-lv2">${s.reason ?? ""}</div>
+          ${renderSignalText(s.signal_text)}
+          ${s.entry_note ? `<div class="table-lv2">${escapeHtml(cleanSignalOutput(s.entry_note))}</div>` : ""}
         </div>`;
 
       let bodyGrid = overviewGrid;
@@ -1188,6 +1269,24 @@
     }
 
     function getNumericValue(s, key) {
+      if (key === "chip_concentration_pct_filter") {
+        const value = pickFirst(s?.chip_concentration_pct_t0, s?.chip_concentration_pct);
+        if (isNil(value) || value === "") return null;
+        const num = Number(value);
+        return Number.isNaN(num) ? null : num;
+      }
+      if (key === "main_force_net_filter") {
+        const value = pickFirst(s?.main_force_net_t0, s?.main_force_net);
+        if (isNil(value) || value === "") return null;
+        const num = Number(value);
+        return Number.isNaN(num) ? null : num;
+      }
+      if (key === "broker_diff_filter") {
+        const value = pickFirst(s?.broker_diff_t0, s?.broker_diff);
+        if (isNil(value) || value === "") return null;
+        const num = Number(value);
+        return Number.isNaN(num) ? null : num;
+      }
       const value = s?.[key];
       if (isNil(value) || value === "") return null;
       const num = Number(value);
