@@ -11,8 +11,51 @@ def _num(x):
         return None
 
 
+SUPPRESSED_CHIP_REASON_PREFIXES = (
+    '籌碼震盪（',
+    '籌碼混亂（',
+)
+
+SUPPRESSED_CHIP_REASON_TEXTS = {
+    '籌碼震盪',
+    '籌碼震盪，方向未定',
+    '籌碼震盪，方向未定。',
+    '籌碼震盪：籌碼震盪，方向未定。',
+    '籌碼混亂：主力買賣互抵且價格無明確方向。',
+}
+
+
+def _clean_reason_text(reason):
+    """Normalize one reason and suppress noisy neutral chip fallback text."""
+    text = str(reason or '').strip()
+    if not text:
+        return ''
+
+    # 這兩種是籌碼情境分類的保守 fallback。以前每次都 append，
+    # 導致幾乎每檔都出現「籌碼震盪（中性）：籌碼震盪，方向未定。」。
+    if text in SUPPRESSED_CHIP_REASON_TEXTS:
+        return ''
+    if any(text.startswith(prefix) for prefix in SUPPRESSED_CHIP_REASON_PREFIXES):
+        return ''
+
+    return text
+
+
+def _dedupe_reasons(reasons):
+    cleaned = []
+    seen = set()
+    for reason in reasons or []:
+        text = _clean_reason_text(reason)
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        cleaned.append(text)
+    return cleaned
+
+
 def _join_reasons(reasons):
-    return ' / '.join([r for r in reasons if r]) if reasons else '訊號尚未明確'
+    values = _dedupe_reasons(reasons)
+    return ' / '.join(values) if values else '訊號尚未明確'
 
 
 def _format_signal_sections(tech_reasons, chip_reasons):
@@ -618,9 +661,13 @@ def get_tech_signal(
         position_zone=position_zone,
         close_position=close_position,
     )
-    chip_reasons.append(
-        f"{chip_scenario['scenario']}（{chip_scenario['bias']}）：{chip_scenario['description']}"
-    )
+    # 只補充有明確方向的籌碼情境。
+    # 「籌碼震盪 / 籌碼混亂」是保守 fallback，若無條件加入，
+    # 會讓每檔股票都出現「籌碼震盪（中性）：籌碼震盪，方向未定。」且與前面的籌碼描述重複。
+    chip_scenario_name = str(chip_scenario.get('scenario') or '').strip()
+    chip_scenario_description = str(chip_scenario.get('description') or '').strip()
+    if chip_scenario_name and chip_scenario_name not in ('籌碼震盪', '籌碼混亂'):
+        chip_reasons.append(f"{chip_scenario_name}：{chip_scenario_description}")
     if repeat_buy_brokers is not None and repeat_buy_brokers >= 3:
         chip_reasons.append('三日重複買超券商增加，主力承接連續性較佳')
     if repeat_sell_brokers is not None and repeat_sell_brokers >= 3:
