@@ -1,4 +1,4 @@
-name: Update Static News CSV
+name: Update AllStatic News
 
 on:
   schedule:
@@ -27,16 +27,19 @@ jobs:
 
       - name: Update Static_news.csv
         env:
-          STOCKS_CSV: stocks.csv
-          ALLSTATIC_NEWS_CSV: AllStatic_news.csv
+          STOCKS_CSV: ${{ vars.STOCKS_CSV || 'stocks.csv' }}
+          ALLSTATIC_NEWS_OUTPUT_FILE: ${{ vars.ALLSTATIC_NEWS_OUTPUT_FILE || 'AllStatic_news.csv' }}
           NEWS_DAYS: ${{ vars.NEWS_DAYS || '10' }}
+          NEWS_MAX_ITEMS: ${{ vars.NEWS_MAX_ITEMS || '12' }}
           NEWS_SLEEP_SEC: ${{ vars.NEWS_SLEEP_SEC || '0.6' }}
+          # 預設保留既有「產業」欄，主要每天更新「新聞」。要重寫產業可設 repo variable REFRESH_INDUSTRY=1。
+          REFRESH_INDUSTRY: ${{ vars.REFRESH_INDUSTRY || '0' }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-4o-mini' }}
         run: |
-          python allstatic_news_service.py
+          python generate_static_news_service.py
 
-      - name: Commit AllStatic_news.csv
+      - name: Commit Static_news.csv
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
