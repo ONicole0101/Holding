@@ -352,32 +352,31 @@
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: 8px;
+      gap: 8px 12px;
       margin-bottom: 2px;
     }
 
     .filter-title {
+      flex: 1 1 auto;
       color: #8b949e;
       font-size: 12px;
-      flex: 1 1 360px;
-      min-width: 240px;
     }
 
-    .filter-code {
-      display: grid;
-      grid-template-columns: auto 140px;
+    .code-filter-item {
+      display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 6px;
       font-size: 12px;
       margin-left: auto;
     }
 
-    .filter-code label {
+    .code-filter-item label {
       color: #c9d1d9;
       white-space: nowrap;
     }
 
-    .filter-code input {
+    .code-filter-item input {
+      width: 118px;
       height: 26px;
       border: 1px solid #30363d;
       border-radius: 6px;
@@ -517,9 +516,7 @@
 <body>
   <div class="container">
     <h2>{{report_title}}</h2>
-    {% if report_subtitle %}
     <p>{{ report_subtitle }}</p>
-    {% endif %}
     <p>產生時間：{{ generated_time }}</p>
 
     <div class="tabs" id="tabs">
@@ -533,9 +530,9 @@
     <div class="filter-panel" id="filterPanel">
       <div class="filter-title-row">
         <div class="filter-title">篩選條件：可多條件累積篩選；輸入即時更新，也可按「套用」。</div>
-        <div class="filter-code">
-          <label>股票代碼</label>
-          <input id="codeFilterInput" type="text" inputmode="numeric" placeholder="例：2330">
+        <div class="code-filter-item">
+          <label for="stockCodeFilter">股票代碼</label>
+          <input id="stockCodeFilter" type="text" inputmode="numeric" placeholder="例如 2330">
         </div>
       </div>
       <div class="filter-item"><label>價格</label><select data-filter-op="price">
@@ -578,6 +575,18 @@
           <option value=">">&gt;</option>
           <option value="<">&lt;</option>
         </select><input data-filter-key="volume_ratio" type="number" step="0.01" placeholder="數值"></div>
+      <div class="filter-item"><label>籌碼集中%</label><select data-filter-op="chip_concentration_pct_filter">
+          <option value=">">&gt;</option>
+          <option value="<">&lt;</option>
+        </select><input data-filter-key="chip_concentration_pct_filter" type="number" step="0.01" placeholder="%"></div>
+      <div class="filter-item"><label>主力買賣超</label><select data-filter-op="main_force_net_filter">
+          <option value=">">&gt;</option>
+          <option value="<">&lt;</option>
+        </select><input data-filter-key="main_force_net_filter" type="number" step="1" placeholder="張數"></div>
+      <div class="filter-item"><label>買賣家數差</label><select data-filter-op="broker_diff_filter">
+          <option value=">">&gt;</option>
+          <option value="<">&lt;</option>
+        </select><input data-filter-key="broker_diff_filter" type="number" step="1" placeholder="家數"></div>
       <div class="filter-actions">
         <button type="button" id="applyFilterBtn">套用</button>
         <button type="button" class="secondary" id="clearFilterBtn">清除</button>
@@ -1047,6 +1056,24 @@
     }
 
     function getNumericValue(s, key) {
+      if (key === "chip_concentration_pct_filter") {
+        const value = pickFirst(s?.chip_concentration_pct_t0, s?.chip_concentration_pct);
+        if (isNil(value) || value === "") return null;
+        const num = Number(value);
+        return Number.isNaN(num) ? null : num;
+      }
+      if (key === "main_force_net_filter") {
+        const value = pickFirst(s?.main_force_net_t0, s?.main_force_net);
+        if (isNil(value) || value === "") return null;
+        const num = Number(value);
+        return Number.isNaN(num) ? null : num;
+      }
+      if (key === "broker_diff_filter") {
+        const value = pickFirst(s?.broker_diff_t0, s?.broker_diff);
+        if (isNil(value) || value === "") return null;
+        const num = Number(value);
+        return Number.isNaN(num) ? null : num;
+      }
       const value = s?.[key];
       if (isNil(value) || value === "") return null;
       const num = Number(value);
@@ -1054,11 +1081,11 @@
     }
 
     function passesFilters(s) {
-      const codeInput = document.getElementById("codeFilterInput");
-      const codeText = String(codeInput?.value ?? "").trim();
-      if (codeText) {
+      const codeInput = document.getElementById("stockCodeFilter");
+      const codeKeyword = String(codeInput?.value ?? "").trim();
+      if (codeKeyword) {
         const stockCode = String(s?.code ?? s?.stock_id ?? "").trim();
-        if (!stockCode.includes(codeText)) return false;
+        if (!stockCode.includes(codeKeyword)) return false;
       }
 
       const inputs = document.querySelectorAll("[data-filter-key]");
@@ -1086,20 +1113,14 @@
     }
 
     function clearFilters() {
-      const codeInput = document.getElementById("codeFilterInput");
-      if (codeInput) codeInput.value = "";
       document.querySelectorAll("[data-filter-key]").forEach(input => input.value = "");
       document.querySelectorAll("[data-filter-op]").forEach(select => select.value = ">");
+      const codeInput = document.getElementById("stockCodeFilter");
+      if (codeInput) codeInput.value = "";
       applyFilters();
     }
 
     function bindFilters() {
-      const codeInput = document.getElementById("codeFilterInput");
-      if (codeInput) {
-        codeInput.addEventListener("input", applyFilters);
-        codeInput.addEventListener("change", applyFilters);
-      }
-
       document.querySelectorAll("[data-filter-key]").forEach(input => {
         input.addEventListener("input", applyFilters);
         input.addEventListener("change", applyFilters);
@@ -1107,6 +1128,11 @@
       document.querySelectorAll("[data-filter-op]").forEach(select => {
         select.addEventListener("change", applyFilters);
       });
+      const codeInput = document.getElementById("stockCodeFilter");
+      if (codeInput) {
+        codeInput.addEventListener("input", applyFilters);
+        codeInput.addEventListener("change", applyFilters);
+      }
       const applyBtn = document.getElementById("applyFilterBtn");
       const clearBtn = document.getElementById("clearFilterBtn");
       if (applyBtn) applyBtn.addEventListener("click", applyFilters);
