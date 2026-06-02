@@ -1,4 +1,4 @@
-name: Update Static News
+name: Update Static News CSV
 
 on:
   schedule:
