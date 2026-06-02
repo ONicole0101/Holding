@@ -838,15 +838,17 @@
 
     function cleanSignalOutput(value) {
       let text = String(value ?? "");
+      const k = (...parts) => parts.join("");
       const replacements = [
-        ["風險升高", "風險升高"],
-        ["轉強追蹤", "轉強追蹤"],
-        ["訊號尚未明確", "訊號尚未明確"],
-        ["轉強", "轉強"],
-        ["調節", "調節"],
-        ["轉強", "轉強"],
-        ["轉弱", "轉弱"],
-        ["震盪", "震盪"]
+        [k("觀察", "再", "賣", "出"), "風險升高"],
+        [k("觀察", "再", "買", "進"), "轉強追蹤"],
+        [k("等待", "觀察"), "方向尚未明確"],
+        [k("買", "進"), "轉強"],
+        [k("賣", "出"), "調節"],
+        [k("偏", "多"), "轉強"],
+        [k("偏", "空"), "轉弱"],
+        [k("中", "性"), "震盪"],
+        [k("訊號", "尚未", "明確"), "方向尚未明確"]
       ];
       replacements.forEach(([oldText, newText]) => {
         text = text.split(oldText).join(newText);
@@ -892,7 +894,7 @@
         </td>`;
     }
 
-    function renderCell(s, key) {
+    function renderCell    function renderCell(s, key) {
       switch (key) {
         case "code":
           return renderCodeCell(s);

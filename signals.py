@@ -32,7 +32,7 @@ def _dedupe_reasons(reasons):
     return result
 
 
-def _join_reasons(reasons, empty='訊號尚未明確'):
+def _join_reasons(reasons, empty='方向尚未明確'):
     clean = _dedupe_reasons(reasons)
     return ' / '.join(clean) if clean else empty
 
@@ -40,9 +40,45 @@ def _join_reasons(reasons, empty='訊號尚未明確'):
 def _format_signal_sections(tech_reasons, chip_reasons):
     """Output signal analysis as two separated sections for HTML rendering."""
     tech_text = _join_reasons(tech_reasons, empty='資料不足')
-    chip_text = _join_reasons(chip_reasons, empty='訊號尚未明確')
+    chip_text = _join_reasons(chip_reasons, empty='方向尚未明確')
     return f'技術面：{tech_text}\n籌碼面：{chip_text}'
 
+
+
+_OUTPUT_REPLACEMENTS = {
+    '觀察再賣出': '風險升高',
+    '觀察再買進': '轉強追蹤',
+    '等待觀察': '方向尚未明確',
+    '買進': '轉強',
+    '賣出': '調節',
+    '偏多': '轉強',
+    '偏空': '轉弱',
+    '中性': '震盪',
+    '訊號尚未明確': '方向尚未明確',
+}
+
+
+def _clean_output_text(text):
+    """Clean public signal text.
+
+    Keep only analysis content for 技術 / 籌碼 / 結論, and remove action labels
+    or bias words that should not appear in the HTML output.
+    """
+    if text is None:
+        return ''
+    value = str(text)
+    for old, new in _OUTPUT_REPLACEMENTS.items():
+        value = value.replace(old, new)
+    # Normalize duplicated separators and whitespace without removing newlines.
+    lines = []
+    for line in value.splitlines():
+        line = ' '.join(line.strip().split())
+        if line:
+            lines.append(line)
+    value = '\n'.join(lines)
+    while ' / / ' in value:
+        value = value.replace(' / / ', ' / ')
+    return value.strip(' /')
 
 def _calc_price_volume_state(chgPct, amp, volume, prev_volume, prev2_volume, volume_ok=None):
     """
@@ -270,9 +306,9 @@ def _get_tech_signal_impl(
 
     if close is None:
         return {
-            'signal': '訊號尚未明確',
+            'signal': '',
             'reason': '缺少收盤價資料',
-            'signal_text': '技術面：資料不足\n籌碼面：訊號尚未明確',
+            'signal_text': '技術面：資料不足\n籌碼面：方向尚未明確',
         }
 
     # === KD 判斷 ===
@@ -588,7 +624,7 @@ def _get_tech_signal_impl(
         and not overheat_confirmed
     ):
         return {
-            'signal': '轉強追蹤' if price_volume_state in ('價漲量增', '價平量增') and kd_strong else '訊號尚未明確',
+            'signal': '',
             'reason': '股價仍在上漲途中且月線趨勢未破，持股以續抱觀察為主，不因KD高檔過早調節',
             'signal_text': _format_signal_sections(reasons, chip_reasons),
         }
@@ -613,7 +649,7 @@ def _get_tech_signal_impl(
         and price_volume_state in ('價漲量縮', '價跌量縮', '價平量縮', '價量震盪')
     ):
         return {
-            'signal': '訊號尚未明確',
+            'signal': '',
             'reason': '仍在下跌途中，反彈或量縮尚不足以確認轉強',
             'signal_text': _format_signal_sections(reasons, chip_reasons),
         }
@@ -638,7 +674,7 @@ def _get_tech_signal_impl(
         and (kd_turn_strong or k_trend_up or kd_low or volume_shrink)
     ):
         return {
-            'signal': '訊號尚未明確',
+            'signal': '',
             'reason': '底部區域跌勢趨緩，但尚未出現明確價漲量增，先觀察止穩',
             'signal_text': _format_signal_sections(reasons, chip_reasons),
         }
@@ -665,7 +701,7 @@ def _get_tech_signal_impl(
         and not ma18_fall_break
     ):
         return {
-            'signal': '訊號尚未明確',
+            'signal': '',
             'reason': '上漲途中出現價漲量縮，持股可觀察但不宜追高',
             'signal_text': _format_signal_sections(reasons, chip_reasons),
         }
@@ -679,7 +715,7 @@ def _get_tech_signal_impl(
         and not ma18_fall_break
     ):
         return {
-            'signal': '訊號尚未明確',
+            'signal': '',
             'reason': '上漲途中動能轉弱但尚未跌破月線，先觀察不急賣',
             'signal_text': _format_signal_sections(reasons, chip_reasons),
         }
@@ -690,14 +726,14 @@ def _get_tech_signal_impl(
         or price_volume_state in ('價平量縮', '價量震盪')
     ):
         return {
-            'signal': '訊號尚未明確',
+            'signal': '',
             'reason': '位階與價量尚未形成明確方向，等待突破或跌破確認',
             'signal_text': _format_signal_sections(reasons, chip_reasons),
         }
 
     # 14) 保守預設。
     return {
-        'signal': '訊號尚未明確',
+        'signal': '',
         'reason': '價格、量能、KD與布林尚未形成明確方向',
         'signal_text': _format_signal_sections(reasons, chip_reasons),
     }
@@ -710,7 +746,7 @@ def get_tech_signal(*args, **kwargs):
     if not isinstance(result, dict):
         return result
     result = dict(result)
-    # Do not expose labels such as 訊號尚未明確/轉強/調節/轉強/震盪/轉弱 in HTML.
+    # Do not expose action or bias labels in HTML.
     result['signal'] = ''
     result['reason'] = _clean_output_text(result.get('reason', ''))
     result['signal_text'] = _clean_output_text(result.get('signal_text', ''))
