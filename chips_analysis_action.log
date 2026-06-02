@@ -1,28 +1,28 @@
-[32m2026-06-01 15:10:29.273[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
-[32m2026-06-01 15:10:29.432[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
-FinMind: token=True, login=ok, usage=620/6000, remain=5380
+[32m2026-06-02 11:44:26.880[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
+[32m2026-06-02 11:44:27.021[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
+FinMind: token=True, login=ok, usage=0/6000, remain=6000
 Build chips: total=20, workers=6, trend_days=3, threshold=15, lookback_days=21, output=AllStatic_Chips.csv
-[1/20] 2360 致茂 status=ok date=2026-06-01 main=33081 diff=-108 state=bullish_distributed
-stock_id  name chip_latest_date main_force_net broker_diff    chip_signal_state chips_status
-    2313    華通       2026-06-01       -5270879           4              neutral           ok
-    2317    鴻海       2026-06-01       -7267075           5              neutral           ok
-    2360    致茂       2026-06-01          33081        -108  bullish_distributed           ok
-    2382    廣達       2026-06-01        5659973          -5              neutral           ok
-    2404    漢唐       2026-06-01          92450          78              neutral           ok
-    2449  京元電子       2026-06-01       -4479763          15              neutral           ok
-    2454   聯發科       2026-06-01         237725           1              neutral           ok
-    3017    奇鋐       2026-06-01         185401         -42              neutral           ok
-    3131    弘塑       2026-06-01         -30545         193              neutral           ok
-    3231    緯創       2026-06-01       15559470         -91 bullish_concentrated           ok
-    3324    雙鴻       2026-06-01         453748         -46              neutral           ok
-    3443    創意       2026-06-01          20189          56              neutral           ok
-    3491   昇達科       2026-06-01         103864         120  bullish_distributed           ok
-    3653    健策       2026-06-01          24445         -26              neutral           ok
-    3665 貿聯-KY       2026-06-01         -22972         143  bearish_distributed           ok
-    3680    家登       2026-06-01        -137052         228  bearish_distributed           ok
-    4749   新應材       2026-06-01        -303867         237              neutral           ok
-    6213    聯茂       2026-06-01        7715194         -73              neutral           ok
-    6442    光聖       2026-06-01         -34842         111  bearish_distributed           ok
-    8028 昇陽半導體       2026-06-01        1429676         -90              neutral           ok
+[1/20] 2360 致茂 status=ok date=2026-06-02 main=149445 diff=246 state=bullish_distributed
+stock_id  name chip_latest_date main_force_net broker_diff   chip_signal_state chips_status
+    2313    華通       2026-06-02       -2899846           9             neutral           ok
+    2317    鴻海       2026-06-02       10374833           1             neutral           ok
+    2360    致茂       2026-06-02         149445         246 bullish_distributed           ok
+    2382    廣達       2026-06-02        1312828          -3             neutral           ok
+    2404    漢唐       2026-06-02        -532665         143             neutral           ok
+    2449  京元電子       2026-06-02       -3873373          19             neutral           ok
+    2454   聯發科       2026-06-02         503971          13             neutral           ok
+    3017    奇鋐       2026-06-02        -120336          49             neutral           ok
+    3131    弘塑       2026-06-02         -12965         131             neutral           ok
+    3231    緯創       2026-06-02       37906041           0             neutral           ok
+    3324    雙鴻       2026-06-02         496469         -50             neutral           ok
+    3443    創意       2026-06-02         -58124         145             neutral           ok
+    3491   昇達科       2026-06-02         -37807         138             neutral           ok
+    3653    健策       2026-06-02          43848         -38 bullish_distributed           ok
+    3665 貿聯-KY       2026-06-02           1820          94             neutral           ok
+    3680    家登       2026-06-02         -29878         192 bearish_distributed           ok
+    4749   新應材       2026-06-02         -85755         184 bearish_distributed           ok
+    6213    聯茂       2026-06-02       -1855151          40             neutral           ok
+    6442    光聖       2026-06-02         -40882         131 bearish_distributed           ok
+    8028 昇陽半導體       2026-06-02        -620193         116             neutral           ok
 rows= 20
 status= {'ok': 20}
