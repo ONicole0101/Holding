@@ -1,4 +1,4 @@
-name: Update AllStatic News
+name: Update Static News
 
 on:
   schedule:
@@ -25,7 +25,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install openai
 
-      - name: Update AllStatic_news.csv
+      - name: Update Static_news.csv
         env:
           STOCKS_CSV: stocks.csv
           ALLSTATIC_NEWS_CSV: AllStatic_news.csv
