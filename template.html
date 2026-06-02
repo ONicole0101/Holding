@@ -208,33 +208,22 @@
       display: flex;
       flex-direction: column;
       gap: 4px;
-      width: 100%;
     }
 
     .signal-section {
-      white-space: normal;
       line-height: 1.45;
+      white-space: normal;
     }
 
     .signal-section-title {
-      display: inline-block;
-      min-width: 46px;
-      color: #e6edf3;
+      color: #c9d1d9;
       font-weight: bold;
     }
 
-    .signal-section-tech {
-      color: #8b949e;
-    }
-
-    .signal-section-chip {
-      color: #c9d1d9;
-      padding-top: 2px;
-      border-top: 1px dashed #30363d;
-    }
-
     .signal-conclusion {
-      color: #d29922;
+      margin-top: 2px;
+      line-height: 1.45;
+      white-space: normal;
     }
 
     .summary {
@@ -304,6 +293,40 @@
 
     .text-green {
       color: #00b050;
+    }
+
+
+    .chip-detail {
+      text-align: center;
+      line-height: 1.25;
+      min-width: 92px;
+    }
+
+    .chip-arrow {
+      font-size: clamp(11px, 1vw, 13px);
+      line-height: 1.2;
+      margin-bottom: 2px;
+    }
+
+    .chip-line {
+      line-height: 1.3;
+      font-size: clamp(11px, 1vw, 12px);
+    }
+
+    .chip-line-small {
+      line-height: 1.25;
+      font-size: clamp(10px, 0.9vw, 11px);
+      color: #8b949e;
+    }
+
+    .chip-line.up,
+    .chip-line-small.up {
+      color: #f85149;
+    }
+
+    .chip-line.dn,
+    .chip-line-small.dn {
+      color: #3fb950;
     }
 
     .mobile-list {
@@ -508,7 +531,41 @@
         display: none;
       }
 
-      .mobile-list {
+  
+    .chip-detail {
+      text-align: center;
+      line-height: 1.25;
+      min-width: 92px;
+    }
+
+    .chip-arrow {
+      font-size: clamp(11px, 1vw, 13px);
+      line-height: 1.2;
+      margin-bottom: 2px;
+    }
+
+    .chip-line {
+      line-height: 1.3;
+      font-size: clamp(11px, 1vw, 12px);
+    }
+
+    .chip-line-small {
+      line-height: 1.25;
+      font-size: clamp(10px, 0.9vw, 11px);
+      color: #8b949e;
+    }
+
+    .chip-line.up,
+    .chip-line-small.up {
+      color: #f85149;
+    }
+
+    .chip-line.dn,
+    .chip-line-small.dn {
+      color: #3fb950;
+    }
+
+    .mobile-list {
         display: block;
       }
     }
@@ -776,27 +833,40 @@
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
+        .replace(/'/g, "&#039;");
     }
 
-    function splitSignalSections(text) {
-      const raw = String(text ?? "").replace(/\r\n/g, "\n").trim();
-      const result = { tech: "", chip: "", other: "" };
-      if (!raw) return result;
-
-      const techMatch = raw.match(/技術面：([\s\S]*?)(?=\n?籌碼面：|$)/);
-      const chipMatch = raw.match(/籌碼面：([\s\S]*)$/);
-      if (techMatch) result.tech = techMatch[1].trim();
-      if (chipMatch) result.chip = chipMatch[1].trim();
-
-      if (!result.tech && !result.chip) {
-        result.other = raw;
-      }
-      return result;
+    function cleanSignalOutput(value) {
+      let text = String(value ?? "");
+      const replacements = [
+        ["風險升高", "風險升高"],
+        ["轉強追蹤", "轉強追蹤"],
+        ["訊號尚未明確", "訊號尚未明確"],
+        ["轉強", "轉強"],
+        ["調節", "調節"],
+        ["轉強", "轉強"],
+        ["轉弱", "轉弱"],
+        ["震盪", "震盪"]
+      ];
+      replacements.forEach(([oldText, newText]) => {
+        text = text.split(oldText).join(newText);
+      });
+      return text.trim();
     }
 
     function renderSignalText(text) {
-      const sections = splitSignalSections(text);
+      const cleaned = cleanSignalOutput(text);
+      if (!cleaned) return "";
+      const sections = { tech: "", chip: "", other: "" };
+      cleaned.split(/\n+/).forEach(line => {
+        const item = line.trim();
+        if (!item) return;
+        if (item.startsWith("技術面：")) sections.tech = item.replace(/^技術面：/, "");
+        else if (item.startsWith("技術：")) sections.tech = item.replace(/^技術：/, "");
+        else if (item.startsWith("籌碼面：")) sections.chip = item.replace(/^籌碼面：/, "");
+        else if (item.startsWith("籌碼：")) sections.chip = item.replace(/^籌碼：/, "");
+        else sections.other += (sections.other ? " / " : "") + item;
+      });
       const blocks = [];
       if (sections.tech) {
         blocks.push(`<div class="signal-section signal-section-tech"><span class="signal-section-title">技術：</span>${escapeHtml(sections.tech)}</div>`);
@@ -804,20 +874,20 @@
       if (sections.chip) {
         blocks.push(`<div class="signal-section signal-section-chip"><span class="signal-section-title">籌碼：</span>${escapeHtml(sections.chip)}</div>`);
       }
-      if (sections.other) {
-        blocks.push(`<div class="signal-section signal-section-tech">${escapeHtml(sections.other)}</div>`);
+      if (!sections.tech && !sections.chip && sections.other) {
+        blocks.push(`<div class="signal-section">${escapeHtml(sections.other)}</div>`);
       }
-      return `<div class="signal-text">${blocks.join("")}</div>`;
+      return `<div class="table-lv2 signal-text">${blocks.join("")}</div>`;
     }
 
     function renderSignalCell(s) {
+      const conclusion = cleanSignalOutput(s.reason ?? "");
       return `
         <td class="signal-cell">
           <div class="signal-wrap">
-            <div class="sig ${s.sig == 1 ? 'up' : s.sig == -1 ? 'dn' : 'watch'}">${s.signal ?? '等待觀察'}</div>
             ${renderSignalText(s.signal_text)}
-            <div class="table-lv2">${s.entry_note ? escapeHtml(s.entry_note) : ""}</div>
-            <div class="table-lv2 signal-conclusion">${s.reason ? `結論：${escapeHtml(s.reason)}` : ""}</div>
+            ${s.entry_note ? `<div class="table-lv2">${escapeHtml(cleanSignalOutput(s.entry_note))}</div>` : ""}
+            <div class="table-lv2 signal-conclusion">${conclusion ? `結論：${escapeHtml(conclusion)}` : ""}</div>
           </div>
         </td>`;
     }
@@ -955,12 +1025,12 @@
           <div class="stock-item"><div class="stock-label">量 / 昨 / 增 / 張</div><div class="stock-value"><div>${fmt(s.volume)} 張</div><div class="table-lv2">昨 ${fmt(s.prev_volume)}</div><div class="table-lv2 ${trendClass(s.volume_ratio)}">${isNil(s.volume_ratio) ? "-" : `${fmtTrend(s.volume_ratio)} ${fmt(s.volume_ratio, "%")}`}</div><div class="table-lv2">${isNil(s.volume_add) ? "-" : `${fmt(s.volume_add)} 張`}</div></div></div>
         </div>`;
 
+      const signalConclusion = cleanSignalOutput(s.reason ?? "");
       const signalBlock = `
         <div class="stock-signal">
-          <span class="sig ${s.sig == 1 ? 'up' : s.sig == -1 ? 'dn' : 'watch'}">${s.signal ?? '等待觀察'}</span>
           ${renderSignalText(s.signal_text)}
-          <div class="table-lv2">${s.entry_note ? escapeHtml(s.entry_note) : ""}</div>
-          <div class="table-lv2 signal-conclusion">${s.reason ? `結論：${escapeHtml(s.reason)}` : ""}</div>
+          ${s.entry_note ? `<div class="table-lv2">${escapeHtml(cleanSignalOutput(s.entry_note))}</div>` : ""}
+          <div class="table-lv2 signal-conclusion">${signalConclusion ? `結論：${escapeHtml(signalConclusion)}` : ""}</div>
         </div>`;
 
       let bodyGrid = overviewGrid;
