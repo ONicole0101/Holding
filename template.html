@@ -196,6 +196,14 @@
       line-height: 1.4;
     }
 
+    .text-summary-cell {
+      min-width: 220px;
+      max-width: 360px;
+      white-space: normal;
+      line-height: 1.45;
+      color: #c9d1d9;
+    }
+
     .signal-wrap {
       display: flex;
       flex-direction: column;
@@ -703,7 +711,7 @@
         ]
       },
       fundamental: {
-        note: "基本面：EPS、營收、毛利率、營益率、淨利率、殖利率、PER/PBR",
+        note: "基本面：EPS、營收、毛利率、營益率、淨利率、殖利率、PER/PBR、產業、新聞",
         columns: [
           { key: "code", label: "代碼<br><small>名稱</small>" },
           { key: "price", label: "價格<br><small>60天LH</small>" },
@@ -715,7 +723,8 @@
           { key: "yield_value", label: "殖利率<br><small>估65%</small>", cls: "col-md" },
           { key: "per_latest", label: "日PER<br><small>60天LH</small>" },
           { key: "pbr_latest", label: "日PBR<br><small>60天LH</small>" },
-          { key: "sig", label: "訊號" }
+          { key: "industry_summary", label: "產業" },
+          { key: "news_summary", label: "新聞" }
         ]
       },
       signal: {
@@ -1077,6 +1086,11 @@
           return `<td>${renderRangeMetric(s.bias18, s.bias18_min, s.bias18_max, "%", distClass(s.bias18))}</td>`;
         case "bias50":
           return `<td>${renderRangeMetric(s.bias50, s.bias50_min, s.bias50_max, "%", distClass(s.bias50))}</td>`;
+
+        case "industry_summary":
+          return `<td class="text-summary-cell">${escapeHtml(s.industry_summary || "-")}</td>`;
+        case "news_summary":
+          return `<td class="text-summary-cell">${escapeHtml(s.news_summary || "-")}</td>`;
         case "sig":
           return renderSignalCell(s);
         default:
@@ -1136,6 +1150,8 @@
           <div class="stock-item"><div class="stock-label">殖利率 估65%</div><div class="stock-value">${fmt(Number(s.yield_value ?? 0) * 0.65, "%")}</div></div>
           <div class="stock-item"><div class="stock-label">日PER 60天LH</div><div class="stock-value">${renderRangeMetric(s.per_latest, s.per_60d_low, s.per_60d_high)}</div></div>
           <div class="stock-item"><div class="stock-label">日PBR 60天LH</div><div class="stock-value">${renderRangeMetric(s.pbr_latest, s.pbr_60d_low, s.pbr_60d_high)}</div></div>
+          <div class="stock-item"><div class="stock-label">產業</div><div class="stock-value">${escapeHtml(s.industry_summary || "-")}</div></div>
+          <div class="stock-item"><div class="stock-label">新聞</div><div class="stock-value">${escapeHtml(s.news_summary || "-")}</div></div>
         </div>`;
 
       const overviewGrid = `
@@ -1145,6 +1161,7 @@
           <div class="stock-item"><div class="stock-label">日布林% LH</div><div class="stock-value"><div class="table-lv1 ${trendClass(s.bb_score)}">${fmtTrend(s.bb_score)}</div>${renderRangeMetric(s.bb_pct, s.bb_lower, s.bb_upper)}</div></div>
           <div class="stock-item"><div class="stock-label">量 / 昨 / 增 / 張</div><div class="stock-value"><div>${fmt(s.volume)} 張</div><div class="table-lv2">昨 ${fmt(s.prev_volume)}</div><div class="table-lv2 ${trendClass(s.volume_ratio)}">${isNil(s.volume_ratio) ? "-" : `${fmtTrend(s.volume_ratio)} ${fmt(s.volume_ratio, "%")}`}</div><div class="table-lv2">${isNil(s.volume_add) ? "-" : `${fmt(s.volume_add)} 張`}</div></div></div>
         </div>`;
+
 
       const signalBlock = `
         <div class="stock-signal">
@@ -1161,7 +1178,7 @@
         <div class="stock-card">
           ${commonHead}
           ${bodyGrid}
-          ${signalBlock}
+          ${tab === "fundamental" ? "" : signalBlock}
         </div>`;
     }
 

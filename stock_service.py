@@ -15,10 +15,17 @@ from technical_indicators import add_indicators, get_kd_trend, get_bb_trend, get
 
 STATIC_CSV_PATH = os.getenv("STATIC_CSV_FILE", "AllStatic.csv")
 STATIC_CHIPS_CSV_PATH = os.getenv("STATIC_CHIPS_FILE") or os.getenv("STATIC_CHIP_FILE", "AllStatic_Chips.csv")
+STATIC_NEWS_CSV_PATH = (
+    os.getenv("ALLSTATIC_NEWS_OUTPUT_FILE")
+    or os.getenv("ALLSTATIC_NEWS_FILE")
+    or os.getenv("ALLSTATIC_NEWS_CSV", "AllStatic_news.csv")
+)
 _STATIC_MAP_CACHE = None
 _STATIC_MAP_MTIME = None
 _CHIPS_STATIC_MAP_CACHE = None
 _CHIPS_STATIC_MAP_MTIME = None
+_NEWS_STATIC_MAP_CACHE = None
+_NEWS_STATIC_MAP_MTIME = None
 
 
 def get_price_60d_high_low(df):
@@ -112,6 +119,42 @@ def load_chips_static_map(static_chips_csv_path=STATIC_CHIPS_CSV_PATH, force_rel
         print(f"❌ 讀取 AllStatic_Chips.csv 失敗: {e}")
         return {}
 
+
+def load_news_static_map(static_news_csv_path=STATIC_NEWS_CSV_PATH, force_reload=False):
+    global _NEWS_STATIC_MAP_CACHE, _NEWS_STATIC_MAP_MTIME
+
+    try:
+        if not os.path.exists(static_news_csv_path):
+            print(f"⚠️ 找不到產業新聞靜態資料檔: {static_news_csv_path}")
+            return {}
+
+        mtime = os.path.getmtime(static_news_csv_path)
+        if (not force_reload) and _NEWS_STATIC_MAP_CACHE is not None and _NEWS_STATIC_MAP_MTIME == mtime:
+            return _NEWS_STATIC_MAP_CACHE
+
+        df = pd.read_csv(static_news_csv_path, encoding="utf-8-sig", dtype={"stock_id": str})
+        df.columns = df.columns.str.strip()
+
+        if "stock_id" not in df.columns:
+            print(f"⚠️ AllStatic_news.csv 缺少 stock_id 欄位: {static_news_csv_path}")
+            return {}
+
+        df = df.where(pd.notna(df), None)
+
+        news_map = {}
+        for _, row in df.iterrows():
+            stock_id = str(row["stock_id"]).strip()
+            news_map[stock_id] = row.to_dict()
+
+        _NEWS_STATIC_MAP_CACHE = news_map
+        _NEWS_STATIC_MAP_MTIME = mtime
+        print(f"✅ 已載入產業新聞靜態資料: {static_news_csv_path}, 筆數={len(news_map)}")
+        return news_map
+
+    except Exception as e:
+        print(f"❌ 讀取 AllStatic_news.csv 失敗: {e}")
+        return {}
+
 def to_float_or_none(v):
     if v is None:
         return None
@@ -152,7 +195,7 @@ def to_str_or_none(v):
     return text if text and text.lower() not in {"nan", "none", "null"} else None
 
 
-def process_stock(s, static_map=None, chips_map=None):
+def process_stock(s, static_map=None, chips_map=None, news_map=None):
     stock_id = str(s["stock_id"])
     name = s["name"]
 
@@ -173,6 +216,7 @@ def process_stock(s, static_map=None, chips_map=None):
 
     static_row = (static_map or {}).get(stock_id, {})
     chip_row = (chips_map or {}).get(stock_id, {})
+    news_row = (news_map or {}).get(stock_id, {})
 
     try:
         df = get_stock_data(stock_id)
@@ -186,6 +230,7 @@ def process_stock(s, static_map=None, chips_map=None):
             })
             x.update(_build_static_fields(static_row))
             x.update(_build_chip_fields(chip_row))
+            x.update(_build_news_fields(news_row))
             return x
 
         if df.empty:
@@ -197,6 +242,7 @@ def process_stock(s, static_map=None, chips_map=None):
             })
             x.update(_build_static_fields(static_row))
             x.update(_build_chip_fields(chip_row))
+            x.update(_build_news_fields(news_row))
             return x
 
         if len(df) < 60:
@@ -208,6 +254,7 @@ def process_stock(s, static_map=None, chips_map=None):
             })
             x.update(_build_static_fields(static_row))
             x.update(_build_chip_fields(chip_row))
+            x.update(_build_news_fields(news_row))
             return x
 
         df = add_indicators(df)
@@ -318,7 +365,8 @@ def process_stock(s, static_map=None, chips_map=None):
 
         static_fields = _build_static_fields(static_row)
         chip_fields = _build_chip_fields(chip_row)
-        merged_static_fields = {**static_fields, **chip_fields}
+        news_fields = _build_news_fields(news_row)
+        merged_static_fields = {**static_fields, **chip_fields, **news_fields}
 
         try:
             signal_res = get_tech_signal(
@@ -433,6 +481,7 @@ def process_stock(s, static_map=None, chips_map=None):
 
             **static_fields,
             **chip_fields,
+            **news_fields,
 
             "dividend": float(dividend) if dividend is not None else None,
             "yield_value": float(yield_value) if yield_value is not None and not pd.isna(yield_value) else None,
@@ -494,6 +543,7 @@ def process_stock(s, static_map=None, chips_map=None):
         x = base.copy()
         x.update(_build_static_fields(static_row))
         x.update(_build_chip_fields(chip_row))
+        x.update(_build_news_fields(news_row))
         x.update({
             "signal": "資料異常",
             "signal_text": "資料異常",
@@ -582,16 +632,35 @@ def _build_chip_fields(chip_row):
         "chips_updated_at": to_str_or_none(chip_row.get("chips_updated_at")),
     }
 
-def get_full_stock_analysis(stock_list, static_map=None, chips_map=None):
+
+def _build_news_fields(news_row):
+    return {
+        "industry_summary": to_str_or_none(
+            news_row.get("產業")
+            or news_row.get("industry_summary")
+            or news_row.get("industry")
+            or news_row.get("news_industry")
+        ),
+        "news_summary": to_str_or_none(
+            news_row.get("新聞")
+            or news_row.get("news_summary")
+            or news_row.get("news")
+            or news_row.get("news_keywords")
+        ),
+    }
+
+def get_full_stock_analysis(stock_list, static_map=None, chips_map=None, news_map=None):
     results = []
     if static_map is None:
         static_map = load_static_map()
     if chips_map is None:
         chips_map = load_chips_static_map()
+    if news_map is None:
+        news_map = load_news_static_map()
 
     for i, s in enumerate(stock_list, 1):
         #   print(f"處理中 {i}/{len(stock_list)}: {s}")
-        data = process_stock(s, static_map=static_map, chips_map=chips_map)
+        data = process_stock(s, static_map=static_map, chips_map=chips_map, news_map=news_map)
         results.append(data)
 
         if data.get("signal") in ("無資料", "資料不足", "資料異常"):
