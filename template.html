@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{report_title}}</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #0d1117;
+      color: #e6edf3;
+      font-family: Arial, sans-serif;
+      margin: 0;
+    }
+
+    .container {
+      width: 100%;
+      margin: 0;
+      padding: 16px;
+    }
+
+    h2 {
+      margin: 0 0 12px 0;
+      font-size: clamp(20px, 2.4vw, 30px);
+      line-height: 1.25;
+    }
+
+    .card {
+      width: 100%;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: clamp(8px, 1vw, 15px);
+      overflow: hidden;
+    }
+
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0;
+      padding: 8px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+    }
+
+    .tab-btn {
+      border: 1px solid #30363d;
+      border-radius: 999px;
+      background: #21262d;
+      color: #c9d1d9;
+      padding: 7px 14px;
+      cursor: pointer;
+      font-size: 13px;
+      line-height: 1;
+    }
+
+    .tab-btn:hover {
+      background: #263041;
+    }
+
+    .tab-btn.active {
+      background: #238636;
+      border-color: #2ea043;
+      color: #fff;
+      font-weight: bold;
+    }
+
+    .tab-note {
+      margin-left: auto;
+      color: #8b949e;
+      font-size: 12px;
+      align-self: center;
+    }
+
+    .table-scroll {
+      overflow: auto;
+      max-height: min(70vh, 700px);
+      position: relative;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: clamp(11px, 1vw, 13px);
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      background: #1c2330;
+      z-index: 200;
+      cursor: pointer;
+      user-select: none;
+      box-shadow: 0 2px 0 #30363d;
+    }
+
+    thead th:hover {
+      background: #263041;
+    }
+
+    tbody td {
+      background: #161b22;
+      position: relative;
+      z-index: 1;
+    }
+
+    tbody td:first-child {
+      position: sticky;
+      left: 0;
+      background: #161b22;
+      z-index: 150;
+    }
+
+    thead th:first-child {
+      position: sticky;
+      top: 0;
+      left: 0;
+      background: #1c2330;
+      z-index: 250;
+    }
+
+    th,
+    td {
+      padding: clamp(6px, 0.8vw, 10px);
+      border-bottom: 1px solid #30363d;
+      border-right: 1px solid #30363d;
+      white-space: nowrap;
+      vertical-align: middle;
+    }
+
+    thead th,
+    tbody td:first-child {
+      background-clip: padding-box;
+    }
+
+    .table-lv1 {
+      font-size: clamp(11px, 1vw, 13px);
+      line-height: 1.25;
+    }
+
+    .table-lv2 {
+      font-size: clamp(10px, 0.9vw, 11px);
+      line-height: 1.2;
+      color: #8b949e;
+    }
+
+    .table-lv3 {
+      font-size: clamp(9px, 0.85vw, 10px);
+      line-height: 1.2;
+      color: #8b949e;
+    }
+
+    .up {
+      color: #f85149;
+    }
+
+    .dn {
+      color: #3fb950;
+    }
+
+    .sig {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    .sig.up {
+      background: #3fb95022;
+      color: #3fb950;
+    }
+
+    .sig.dn {
+      background: #f8514922;
+      color: #f85149;
+    }
+
+    .sig.watch {
+      background: #d2992222;
+      color: #d29922;
+    }
+
+    .signal-cell {
+      min-width: 180px;
+      white-space: normal;
+      line-height: 1.4;
+    }
+
+    .signal-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .box {
+      padding: clamp(8px, 1.5vw, 12px);
+      border-radius: 8px;
+      text-align: center;
+      min-width: 0;
+      font-size: clamp(12px, 1vw, 14px);
+    }
+
+    .buy {
+      background: #3fb95022;
+    }
+
+    .sell {
+      background: #f8514922;
+    }
+
+    .watch {
+      background: #d2992222;
+    }
+
+    .hold {
+      background: #8b949e22;
+    }
+
+    .metric {
+      text-align: center;
+      line-height: 1.2;
+    }
+
+    .metric-main {
+      font-size: clamp(11px, 1vw, 12px);
+      font-weight: normal;
+    }
+
+    .metric-sub {
+      font-size: clamp(10px, 0.9vw, 11px);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .metric-2line {
+      line-height: 1.4;
+    }
+
+    .metric-note {
+      display: block;
+      margin-top: 2px;
+      font-size: 10px;
+      color: #8b949e;
+      white-space: normal;
+    }
+
+    .text-red {
+      color: #ff4d4f;
+    }
+
+    .text-green {
+      color: #00b050;
+    }
+
+    .mobile-list {
+      display: none;
+    }
+
+    .stock-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+
+    .stock-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .stock-title {
+      font-size: 15px;
+      font-weight: bold;
+    }
+
+    .stock-price {
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    .stock-change {
+      font-size: 13px;
+    }
+
+    .stock-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px 10px;
+      font-size: 12px;
+    }
+
+    .stock-item {
+      min-width: 0;
+    }
+
+    .stock-label {
+      color: #8b949e;
+      font-size: 11px;
+      margin-bottom: 2px;
+    }
+
+    .stock-value {
+      word-break: break-word;
+    }
+
+    .stock-signal {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid #30363d;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .filter-panel {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: end;
+      gap: 8px;
+      margin: 10px 0 14px;
+      padding: 10px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+    }
+
+    .filter-title-row {
+      width: 100%;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 2px;
+    }
+
+    .filter-title {
+      color: #8b949e;
+      font-size: 12px;
+      flex: 1 1 360px;
+      min-width: 240px;
+    }
+
+    .filter-code {
+      display: grid;
+      grid-template-columns: auto 140px;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      margin-left: auto;
+    }
+
+    .filter-code label {
+      color: #c9d1d9;
+      white-space: nowrap;
+    }
+
+    .filter-code input {
+      height: 26px;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      background: #0d1117;
+      color: #e6edf3;
+      padding: 2px 6px;
+      font-size: 12px;
+    }
+
+    .filter-item {
+      display: grid;
+      grid-template-columns: auto 44px 82px;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+    }
+
+    .filter-item label {
+      color: #c9d1d9;
+      white-space: nowrap;
+    }
+
+    .filter-item select,
+    .filter-item input {
+      height: 26px;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      background: #0d1117;
+      color: #e6edf3;
+      padding: 2px 6px;
+      font-size: 12px;
+    }
+
+    .filter-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+    }
+
+    .filter-actions button {
+      height: 28px;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      background: #238636;
+      color: #fff;
+      padding: 2px 10px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .filter-actions button.secondary {
+      background: #21262d;
+    }
+
+    .filter-count {
+      color: #8b949e;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .col-volume {
+      width: 76px;
+      min-width: 76px;
+      max-width: 82px;
+      padding-left: 4px;
+      padding-right: 4px;
+    }
+
+    @media (max-width: 1024px) {
+      .container {
+        padding: 12px;
+      }
+
+      .summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      th,
+      td {
+        padding: 6px;
+        font-size: 11px;
+      }
+
+      .col-lg {
+        display: none;
+      }
+
+      .table-scroll {
+        max-height: 65vh;
+      }
+
+      .tab-note {
+        width: 100%;
+        margin-left: 0;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .container {
+        padding: 8px;
+      }
+
+      .summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .tabs {
+        gap: 6px;
+        padding: 6px;
+      }
+
+      .tab-btn {
+        padding: 7px 10px;
+        font-size: 12px;
+      }
+
+      .card {
+        padding: 0;
+        border: none;
+        background: transparent;
+        overflow: visible;
+      }
+
+      .table-scroll {
+        display: none;
+      }
+
+      .mobile-list {
+        display: block;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h2>{{report_title}}</h2>
+    {% if report_subtitle %}
+    <p>{{ report_subtitle }}</p>
+    {% endif %}
+    <p>產生時間：{{ generated_time }}</p>
+
+    <div class="tabs" id="tabs">
+      <button type="button" class="tab-btn active" data-tab="overview">總覽</button>
+      <button type="button" class="tab-btn" data-tab="technical">技術面</button>
+      <button type="button" class="tab-btn" data-tab="fundamental">基本面</button>
+      <button type="button" class="tab-btn" data-tab="signal">訊號</button>
+      <span class="tab-note" id="tabNote">總覽：價格、漲跌、量、EPS、KD、布林、訊號</span>
+    </div>
+
+    <div class="filter-panel" id="filterPanel">
+      <div class="filter-title-row">
+        <div class="filter-title">篩選條件：可多條件累積篩選；輸入即時更新，也可按「套用」。</div>
+        <div class="filter-code">
+          <label>股票代碼</label>
+          <input id="codeFilterInput" type="text" inputmode="numeric" placeholder="例：2330">
+        </div>
+      </div>
+      <div class="filter-item"><label>價格</label><select data-filter-op="price">
+          <option value=">">&gt;</option>
+          <option value="<">&lt;</option>
+        </select><input data-filter-key="price" type="number" step="0.01" placeholder="數值"></div>
+      <div class="filter-item"><label>漲跌%</label><select data-filter-op="chgPct">
+          <option value=">">&gt;</option>
+          <option value="<">&lt;</option>
+        </select><input data-filter-key="chgPct" type="number" step="0.01" placeholder="數值"></div>
+      <div class="filter-item"><label>EPS</label><select data-filter-op="eps_Y">
+          <option value=">">&gt;</option>
+          <option value="<">&lt;</option>
+        </select><input data-filter-key="eps_Y" type="number" step="0.01" placeholder="數值"></div>
+      <div class="filter-item"><label>毛利率</label><select data-filter-op="gross_margin">
+          <option value=">">&gt;</option>
+          <option value="<">&lt;</option>
+        </select><input data-filter-key="gross_margin" type="number" step="0.01" placeholder="數值"></div>
+      <div class="filter-item"><label>日KD</label><select data-filter-op="k">
+          <option value=">">&gt;</option>
+          <option value="<">&lt;</option>
+        </select><input data-filter-key="k" type="number" step="0.01" placeholder="數值"></div>
+      <div class="filter-item"><label>日布林%</label><select data-filter-op="bb_pct">
+          <option value=">">&gt;</option>
+          <option value="<">&lt;</option>
+        </select><input data-filter-key="bb_pct" type="number" step="0.01" placeholder="數值"></div>
+      <div class="filter-item"><label>日Bias6</label><select data-filter-op="bias6">
+          <option value=">">&gt;</option>
+          <option value="<">&lt;</option>
+        </select><input data-filter-key="bias6" type="number" step="0.01" placeholder="數值"></div>
+      <div class="filter-item"><label>日Bias18</label><select data-filter-op="bias18">
+          <option value=">">&gt;</option>
+          <option value="<">&lt;</option>
+        </select><input data-filter-key="bias18" type="number" step="0.01" placeholder="數值"></div>
+      <div class="filter-item"><label>日成交量</label><select data-filter-op="volume">
+          <option value=">">&gt;</option>
+          <option value="<">&lt;</option>
+        </select><input data-filter-key="volume" type="number" step="1" placeholder="張數"></div>
+      <div class="filter-item"><label>日增量%</label><select data-filter-op="volume_ratio">
+          <option value=">">&gt;</option>
+          <option value="<">&lt;</option>
+        </select><input data-filter-key="volume_ratio" type="number" step="0.01" placeholder="數值"></div>
+      <div class="filter-actions">
+        <button type="button" id="applyFilterBtn">套用</button>
+        <button type="button" class="secondary" id="clearFilterBtn">清除</button>
+        <span class="filter-count" id="filterCount"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="table-scroll">
+        <table>
+          <thead id="stockHead"></thead>
+          <tbody id="stockBody"></tbody>
+        </table>
+      </div>
+
+      <div class="mobile-list" id="mobileList"></div>
+    </div>
+  </div>
+
+  <script>
+    const stocks = {{ stocks | tojson }};
+    const baseStocks = Array.isArray(stocks) ? [...stocks] : [];
+    let sortedStocks = [...baseStocks];
+    let currentSortKey = "";
+    let currentSortDirection = "asc";
+    let currentTab = "overview";
+
+    const TAB_CONFIG = {
+      overview: {
+        note: "總覽：價格、漲跌、量、EPS、KD、布林、訊號",
+        columns: [
+          { key: "code", label: "代碼<br><small>名稱</small>" },
+          { key: "price", label: "價格<br><small>60天LH</small>" },
+          { key: "chg", label: "漲跌<br><small>LH</small>" },
+          { key: "chgPct", label: "漲跌%<br><small>震幅%</small>" },
+          { key: "volume", label: "量<br><small>昨/增/張</small>", cls: "col-volume" },
+          { key: "eps_Y", label: "EPS<br><small>TTM</small>", cls: "col-lg" },
+          { key: "k", label: "日KD<br><small>3天趨勢</small>" },
+          { key: "bb_pct", label: "日布林%<br><small>LH</small>", cls: "col-md" },
+          { key: "sig", label: "訊號" }
+        ]
+      },
+      technical: {
+        note: "技術面：價格、KD、布林、Bias、PER/PBR 60天區間",
+        columns: [
+          { key: "code", label: "代碼<br><small>名稱</small>" },
+          { key: "price", label: "價格<br><small>60天LH</small>" },
+          { key: "chgPct", label: "漲跌%<br><small>震幅%</small>" },
+          { key: "volume", label: "量<br><small>昨/增/張</small>", cls: "col-volume" },
+          { key: "k", label: "日KD<br><small>3天趨勢</small>" },
+          { key: "bb_pct", label: "日布林%<br><small>LH</small>" },
+          { key: "bias6", label: "日Bias6<br><small>LH</small>" },
+          { key: "bias18", label: "日Bias18<br><small>LH</small>" },
+          { key: "bias50", label: "日Bias50<br><small>LH</small>", cls: "col-lg" },
+          { key: "per_latest", label: "日PER<br><small>60天LH</small>", cls: "col-lg" },
+          { key: "pbr_latest", label: "日PBR<br><small>60天LH</small>", cls: "col-lg" },
+          { key: "sig", label: "訊號" }
+        ]
+      },
+      fundamental: {
+        note: "基本面：EPS、營收、毛利率、營益率、淨利率、殖利率、PER/PBR",
+        columns: [
+          { key: "code", label: "代碼<br><small>名稱</small>" },
+          { key: "price", label: "價格<br><small>60天LH</small>" },
+          { key: "eps_Y", label: "EPS<br><small>TTM</small>" },
+          { key: "rev", label: "營收(bn)<br><small>M / Q / Y</small>" },
+          { key: "gross_margin", label: "毛利率%<br><small>QoQ / YoY</small>" },
+          { key: "operating_margin", label: "營益率%<br><small>QoQ / YoY</small>" },
+          { key: "net_margin", label: "淨利率%<br><small>QoQ / Y</small>" },
+          { key: "yield_value", label: "殖利率<br><small>估65%</small>", cls: "col-md" },
+          { key: "per_latest", label: "日PER<br><small>60天LH</small>" },
+          { key: "pbr_latest", label: "日PBR<br><small>60天LH</small>" },
+          { key: "sig", label: "訊號" }
+        ]
+      },
+      signal: {
+        note: "訊號：買賣觀察、訊號文字、進場提示、原因",
+        columns: [
+          { key: "code", label: "代碼<br><small>名稱</small>" },
+          { key: "price", label: "價格<br><small>60天LH</small>" },
+          { key: "chgPct", label: "漲跌%<br><small>震幅%</small>" },
+          { key: "volume", label: "量<br><small>昨/增/張</small>", cls: "col-volume" },
+          { key: "k", label: "日KD<br><small>3天趨勢</small>" },
+          { key: "bb_pct", label: "日布林%<br><small>LH</small>" },
+          { key: "bias6", label: "日Bias6<br><small>LH</small>", cls: "col-lg" },
+          { key: "sig", label: "訊號" }
+        ]
+      }
+    };
+
+    function isNil(v) {
+      return v === null || v === undefined || (typeof v === "number" && Number.isNaN(v));
+    }
+
+    function fmt(v, suffix = "") {
+      if (v === null || v === undefined || v === "" || Number.isNaN(v)) return "-";
+      const num = Number(v);
+      if (num === 0) return "0" + suffix;
+      const isInteger = Number.isInteger(num);
+      const formatted = isInteger
+        ? num.toLocaleString("en-US")
+        : num.toLocaleString("en-US", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        });
+      return formatted + suffix;
+    }
+
+    function fmtTrend(v) {
+      if (v >= 1) return "↑↑";
+      if (v > 0) return "↑";
+      if (v <= -1) return "↓↓";
+      if (v < 0) return "↓";
+      return "→";
+    }
+
+    function trendClass(v) {
+      if (v >= 1) return "up strong";
+      if (v > 0) return "up";
+      if (v <= -1) return "dn strong";
+      if (v < 0) return "dn";
+      return "";
+    }
+
+    function renderMetric3(value, m, q, y, suffix = "") {
+      const renderLine = (label, v) => {
+        if (isNil(v)) {
+          return `<div>${label} -</div>`;
+        }
+        return `
+      <div class="${trendClass(v)}">
+        ${label} ${fmtTrend(v)} ${fmt(v, "%")}
+      </div>
+    `;
+      };
+      return `
+  <div class="metric">
+    <div class="table-lv1">${fmt(value, suffix)}</div>
+    <div class="metric-sub">
+      ${renderLine("M", m)}
+      ${renderLine("Q", q)}
+      ${renderLine("Y", y)}
+    </div>
+  </div>`;
+    }
+
+    function renderRangeMetric(current, low, high, suffix = "", cls = "") {
+      return `
+      <div class="metric metric-2line">
+        <div class="table-lv1 ${cls}">${fmt(current, suffix)}</div>
+        <div class="table-lv2">${fmt(low, suffix)}</div>
+        <div class="table-lv2">${fmt(high, suffix)}</div>
+      </div>`;
+    }
+
+    function distClass(val) {
+      if (isNil(val)) return "";
+      if (Number(val) > 0) return "up";
+      if (Number(val) < 0) return "dn";
+      return "";
+    }
+
+    function fmtMonthDay(dateText) {
+      if (isNil(dateText) || dateText === "") return "";
+      const parts = String(dateText).slice(0, 10).split("-");
+      if (parts.length >= 3) return `${parts[1]}/${parts[2]}`;
+      return String(dateText);
+    }
+
+    function dispositionPeriodText(s) {
+      const start = fmtMonthDay(s.period_start ?? s.disposition_period_start);
+      const end = fmtMonthDay(s.period_end ?? s.disposition_period_end);
+      if (!start || !end) return "";
+      return `${start}-${end}`;
+    }
+
+    function shortName(name) {
+      const text = String(name ?? "-");
+      return Array.from(text).slice(0, 3).join("");
+    }
+
+    function chgClass(s) {
+      return Number(s.chgPct ?? 0) >= 0 ? "up" : "dn";
+    }
+
+    function chgSign(s) {
+      return Number(s.chgPct ?? 0) >= 0 ? "+" : "";
+    }
+
+    function renderCodeCell(s) {
+      const dispositionText = dispositionPeriodText(s);
+      return `
+        <td>
+          <div class="table-lv1">${s.code ?? ""}</div>
+          <div class="table-lv2">${shortName(s.name)}</div>
+          ${dispositionText ? `<div class="table-lv3 text-red">${dispositionText}</div>` : ""}
+        </td>`;
+    }
+
+    function renderSignalCell(s) {
+      return `
+        <td class="signal-cell">
+          <div class="signal-wrap">
+            <div class="sig ${s.sig == 1 ? 'up' : s.sig == -1 ? 'dn' : 'watch'}">${s.signal ?? '等待觀察'}</div>
+            <div class="table-lv2">${s.signal_text ?? ""}</div>
+            <div class="table-lv2">${s.entry_note ? s.entry_note : ""}</div>
+            <div class="table-lv2">${s.reason ?? ""}</div>
+          </div>
+        </td>`;
+    }
+
+    function renderCell(s, key) {
+      switch (key) {
+        case "code":
+          return renderCodeCell(s);
+        case "price":
+          return `<td>${renderRangeMetric(s.price, s.price_60d_low, s.price_60d_high)}</td>`;
+        case "chg":
+          return `
+            <td>
+              <div class="table-lv1 ${chgClass(s)}">${chgSign(s)}${fmt(s.chg)}</div>
+              <div class="table-lv2">${fmt(s.price_min)}</div>
+              <div class="table-lv2">${fmt(s.price_max)}</div>
+              <div class="table-lv3">(${(Number(s.price_max ?? 0) - Number(s.price_min ?? 0)).toFixed(2)})</div>
+            </td>`;
+        case "chgPct":
+          return `
+            <td>
+              <div class="table-lv1 ${chgClass(s)}">${chgSign(s)}${fmt(s.chgPct, "%")}</div>
+              <div class="table-lv2">${fmt(s.amp, "%")}</div>
+            </td>`;
+        case "volume":
+          return `
+            <td class="col-volume">
+              <div class="table-lv1">${fmt(s.volume)}</div>
+              <div class="table-lv2">昨 ${fmt(s.prev_volume)}</div>
+              <div class="table-lv2 ${trendClass(s.volume_ratio)}">${isNil(s.volume_ratio) ? "-" : `${fmtTrend(s.volume_ratio)}${fmt(s.volume_ratio, "%")}`}</div>
+              <div class="table-lv3">${isNil(s.volume_add) ? "-" : `${fmt(s.volume_add)}張`}</div>
+            </td>`;
+        case "eps_Y":
+          return `
+            <td>
+              <div class="table-lv1">${fmt(s.eps_Y)}</div>
+              <div class="table-lv2">${fmt(s.eps_ttm)}</div>
+            </td>`;
+        case "rev":
+          return `<td>${renderMetric3(s.rev, s.rev_mom, s.rev_qoq, s.rev_yoy)}</td>`;
+        case "gross_margin":
+          return `<td>${renderMetric3(s.gross_margin, null, s.gross_margin_qoq, s.gross_margin_yoy_diff)}</td>`;
+        case "operating_margin":
+          return `<td>${renderMetric3(s.operating_margin, null, s.operating_margin_qoq, s.operating_margin_yoy_diff)}</td>`;
+        case "net_margin":
+          return `<td>${renderMetric3(s.net_margin, null, s.net_margin_qoq, s.net_margin_yoy_diff)}</td>`;
+        case "yield_value":
+          return `<td>${fmt(Number(s.yield_value ?? 0) * 0.65, "%")}</td>`;
+        case "per_latest":
+          return `<td>${renderRangeMetric(s.per_latest, s.per_60d_low, s.per_60d_high)}</td>`;
+        case "pbr_latest":
+          return `<td>${renderRangeMetric(s.pbr_latest, s.pbr_60d_low, s.pbr_60d_high)}</td>`;
+        case "k":
+          return `
+            <td>
+              <div class="table-lv1 ${trendClass(s.kd_score)}">${fmtTrend(s.kd_score)}</div>
+              <div class="table-lv2">K ${fmt(s.k)}</div>
+              <div class="table-lv2">D ${fmt(s.d)}</div>
+            </td>`;
+        case "bb_pct":
+          return `
+            <td>
+              <div class="table-lv1 ${trendClass(s.bb_score)}">${fmtTrend(s.bb_score)}</div>
+              ${renderRangeMetric(s.bb_pct, s.bb_lower, s.bb_upper)}
+            </td>`;
+        case "bias6":
+          return `<td>${renderRangeMetric(s.bias6, s.bias6_min, s.bias6_max, "%", distClass(s.bias6))}</td>`;
+        case "bias18":
+          return `<td>${renderRangeMetric(s.bias18, s.bias18_min, s.bias18_max, "%", distClass(s.bias18))}</td>`;
+        case "bias50":
+          return `<td>${renderRangeMetric(s.bias50, s.bias50_min, s.bias50_max, "%", distClass(s.bias50))}</td>`;
+        case "sig":
+          return renderSignalCell(s);
+        default:
+          return `<td>${fmt(s[key])}</td>`;
+      }
+    }
+
+    function renderHead() {
+      const columns = TAB_CONFIG[currentTab].columns;
+      document.getElementById("stockHead").innerHTML = `
+        <tr>
+          ${columns.map(col => `<th class="${col.cls ?? ""}" data-key="${col.key}">${col.label}</th>`).join("")}
+        </tr>`;
+      bindSorting();
+      updateSortIndicators();
+    }
+
+    function renderRow(s) {
+      const columns = TAB_CONFIG[currentTab].columns;
+      return `<tr>${columns.map(col => renderCell(s, col.key)).join("")}</tr>`;
+    }
+
+    function renderMobileCard(s) {
+      const dispositionText = dispositionPeriodText(s);
+      const tab = currentTab;
+
+      const commonHead = `
+        <div class="stock-head">
+          <div>
+            <div class="table-lv1"><b>${shortName(s.name)} (${s.code ?? ""})</b></div>
+            ${dispositionText ? `<div class="table-lv3 text-red">${dispositionText}</div>` : ""}
+            <div class="table-lv2 ${chgClass(s)}">${chgSign(s)}${fmt(s.chg)} / ${chgSign(s)}${fmt(s.chgPct, "%")}</div>
+          </div>
+          <div class="stock-value">${renderRangeMetric(s.price, s.price_60d_low, s.price_60d_high)}</div>
+        </div>`;
+
+      const technicalGrid = `
+        <div class="stock-grid">
+          <div class="stock-item"><div class="stock-label">日KD 3天趨勢</div><div class="stock-value"><div class="table-lv1 ${trendClass(s.kd_score)}">${fmtTrend(s.kd_score)}</div><div class="table-lv2">K ${fmt(s.k)} / D ${fmt(s.d)}</div></div></div>
+          <div class="stock-item"><div class="stock-label">日布林% LH</div><div class="stock-value"><div class="table-lv1 ${trendClass(s.bb_score)}">${fmtTrend(s.bb_score)}</div>${renderRangeMetric(s.bb_pct, s.bb_lower, s.bb_upper)}</div></div>
+          <div class="stock-item"><div class="stock-label">日Bias6 LH</div><div class="stock-value">${renderRangeMetric(s.bias6, s.bias6_min, s.bias6_max, "%", distClass(s.bias6))}</div></div>
+          <div class="stock-item"><div class="stock-label">日Bias18 LH</div><div class="stock-value">${renderRangeMetric(s.bias18, s.bias18_min, s.bias18_max, "%", distClass(s.bias18))}</div></div>
+          <div class="stock-item"><div class="stock-label">日Bias50 LH</div><div class="stock-value">${renderRangeMetric(s.bias50, s.bias50_min, s.bias50_max, "%", distClass(s.bias50))}</div></div>
+          <div class="stock-item"><div class="stock-label">量 / 昨 / 增 / 張</div><div class="stock-value"><div>${fmt(s.volume)} 張</div><div class="table-lv2">昨 ${fmt(s.prev_volume)}</div><div class="table-lv2 ${trendClass(s.volume_ratio)}">${isNil(s.volume_ratio) ? "-" : `${fmtTrend(s.volume_ratio)} ${fmt(s.volume_ratio, "%")}`}</div><div class="table-lv2">${isNil(s.volume_add) ? "-" : `${fmt(s.volume_add)} 張`}</div></div></div>
+        </div>`;
+
+      const fundamentalGrid = `
+        <div class="stock-grid">
+          <div class="stock-item"><div class="stock-label">EPS / TTM</div><div class="stock-value"><div class="table-lv1">${fmt(s.eps_Y)}</div><div class="table-lv2">${fmt(s.eps_ttm)}</div></div></div>
+          <div class="stock-item"><div class="stock-label">營收</div><div class="stock-value">${renderMetric3(s.rev, s.rev_mom, s.rev_qoq, s.rev_yoy)}</div></div>
+          <div class="stock-item"><div class="stock-label">毛利率</div><div class="stock-value">${renderMetric3(s.gross_margin, null, s.gross_margin_qoq, s.gross_margin_yoy_diff)}</div></div>
+          <div class="stock-item"><div class="stock-label">營益率</div><div class="stock-value">${renderMetric3(s.operating_margin, null, s.operating_margin_qoq, s.operating_margin_yoy_diff)}</div></div>
+          <div class="stock-item"><div class="stock-label">淨利率</div><div class="stock-value">${renderMetric3(s.net_margin, null, s.net_margin_qoq, s.net_margin_yoy_diff)}</div></div>
+          <div class="stock-item"><div class="stock-label">殖利率 估65%</div><div class="stock-value">${fmt(Number(s.yield_value ?? 0) * 0.65, "%")}</div></div>
+          <div class="stock-item"><div class="stock-label">日PER 60天LH</div><div class="stock-value">${renderRangeMetric(s.per_latest, s.per_60d_low, s.per_60d_high)}</div></div>
+          <div class="stock-item"><div class="stock-label">日PBR 60天LH</div><div class="stock-value">${renderRangeMetric(s.pbr_latest, s.pbr_60d_low, s.pbr_60d_high)}</div></div>
+        </div>`;
+
+      const overviewGrid = `
+        <div class="stock-grid">
+          <div class="stock-item"><div class="stock-label">EPS / TTM</div><div class="stock-value"><div class="table-lv1">${fmt(s.eps_Y)}</div><div class="table-lv2">${fmt(s.eps_ttm)}</div></div></div>
+          <div class="stock-item"><div class="stock-label">日KD</div><div class="stock-value"><div class="table-lv1 ${trendClass(s.kd_score)}">${fmtTrend(s.kd_score)}</div><div class="table-lv2">K ${fmt(s.k)} / D ${fmt(s.d)}</div></div></div>
+          <div class="stock-item"><div class="stock-label">日布林% LH</div><div class="stock-value"><div class="table-lv1 ${trendClass(s.bb_score)}">${fmtTrend(s.bb_score)}</div>${renderRangeMetric(s.bb_pct, s.bb_lower, s.bb_upper)}</div></div>
+          <div class="stock-item"><div class="stock-label">量 / 昨 / 增 / 張</div><div class="stock-value"><div>${fmt(s.volume)} 張</div><div class="table-lv2">昨 ${fmt(s.prev_volume)}</div><div class="table-lv2 ${trendClass(s.volume_ratio)}">${isNil(s.volume_ratio) ? "-" : `${fmtTrend(s.volume_ratio)} ${fmt(s.volume_ratio, "%")}`}</div><div class="table-lv2">${isNil(s.volume_add) ? "-" : `${fmt(s.volume_add)} 張`}</div></div></div>
+        </div>`;
+
+      const signalBlock = `
+        <div class="stock-signal">
+          <span class="sig ${s.sig == 1 ? 'up' : s.sig == -1 ? 'dn' : 'watch'}">${s.signal ?? '等待觀察'}</span>
+          <div class="table-lv2">${s.signal_text ?? ""}</div>
+          <div class="table-lv2">${s.entry_note ?? ""}</div>
+          <div class="table-lv2">${s.reason ?? ""}</div>
+        </div>`;
+
+      let bodyGrid = overviewGrid;
+      if (tab === "technical") bodyGrid = technicalGrid;
+      if (tab === "fundamental") bodyGrid = fundamentalGrid;
+      if (tab === "signal") bodyGrid = technicalGrid;
+
+      return `
+        <div class="stock-card">
+          ${commonHead}
+          ${bodyGrid}
+          ${signalBlock}
+        </div>`;
+    }
+
+    function renderTable(data) {
+      document.getElementById("stockBody").innerHTML = data.map(renderRow).join("");
+    }
+
+    function renderMobileCards(data) {
+      document.getElementById("mobileList").innerHTML = data.map(renderMobileCard).join("");
+    }
+
+    function getSortValue(s, key) {
+      switch (key) {
+        case "name":
+          return s.name ?? "";
+        case "code":
+          return s.code ?? "";
+        case "sig":
+          return Number(s.sig ?? -999999);
+        case "yield_value":
+          return Number(((s.yield_value ?? 0) * 0.65).toFixed(4));
+        case "per_latest":
+        case "pbr_latest":
+          return Number(s[key] ?? -999999);
+        default: {
+          const value = s[key];
+          if (isNil(value) || value === "") return -999999;
+          const num = Number(value);
+          return Number.isNaN(num) ? String(value) : num;
+        }
+      }
+    }
+
+    function sortStocks(key) {
+      if (currentSortKey === key) {
+        currentSortDirection = currentSortDirection === "asc" ? "desc" : "asc";
+      } else {
+        currentSortKey = key;
+        currentSortDirection = "asc";
+      }
+      sortCurrentRows();
+      renderAll();
+    }
+
+    function sortCurrentRows() {
+      if (!currentSortKey) return;
+      sortedStocks.sort((a, b) => {
+        const aVal = getSortValue(a, currentSortKey);
+        const bVal = getSortValue(b, currentSortKey);
+        const bothNumbers = typeof aVal === "number" && typeof bVal === "number";
+
+        if (bothNumbers) {
+          return currentSortDirection === "asc" ? aVal - bVal : bVal - aVal;
+        }
+
+        const result = String(aVal).localeCompare(String(bVal), "zh-Hant");
+        return currentSortDirection === "asc" ? result : -result;
+      });
+    }
+
+    function renderAll() {
+      renderHead();
+      renderTable(sortedStocks);
+      renderMobileCards(sortedStocks);
+      updateSortIndicators();
+      const countEl = document.getElementById("filterCount");
+      if (countEl) countEl.innerText = `顯示 ${sortedStocks.length} / ${baseStocks.length} 筆`;
+    }
+
+    function updateSortIndicators() {
+      document.querySelectorAll("thead th").forEach((th) => {
+        const key = th.dataset.key;
+        if (!key) return;
+
+        if (!th.dataset.label) {
+          th.dataset.label = th.innerHTML.replace(/\s*[▲▼]$/, "");
+        }
+
+        th.innerHTML = key === currentSortKey
+          ? `${th.dataset.label} ${currentSortDirection === "asc" ? "▲" : "▼"}`
+          : th.dataset.label;
+      });
+    }
+
+    function bindSorting() {
+      document.querySelectorAll("thead th[data-key]").forEach((th) => {
+        th.addEventListener("click", () => {
+          sortStocks(th.dataset.key);
+        });
+      });
+    }
+
+    function bindTabs() {
+      document.querySelectorAll(".tab-btn[data-tab]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const nextTab = btn.dataset.tab;
+          if (!TAB_CONFIG[nextTab]) return;
+          currentTab = nextTab;
+          document.querySelectorAll(".tab-btn[data-tab]").forEach(b => b.classList.toggle("active", b.dataset.tab === currentTab));
+          const note = document.getElementById("tabNote");
+          if (note) note.innerText = TAB_CONFIG[currentTab].note;
+          renderAll();
+        });
+      });
+    }
+
+    function getNumericValue(s, key) {
+      const value = s?.[key];
+      if (isNil(value) || value === "") return null;
+      const num = Number(value);
+      return Number.isNaN(num) ? null : num;
+    }
+
+    function passesFilters(s) {
+      const codeInput = document.getElementById("codeFilterInput");
+      const codeText = String(codeInput?.value ?? "").trim();
+      if (codeText) {
+        const stockCode = String(s?.code ?? s?.stock_id ?? "").trim();
+        if (!stockCode.includes(codeText)) return false;
+      }
+
+      const inputs = document.querySelectorAll("[data-filter-key]");
+      for (const input of inputs) {
+        const raw = String(input.value ?? "").trim();
+        if (raw === "") continue;
+
+        const key = input.dataset.filterKey;
+        const target = Number(raw);
+        const value = getNumericValue(s, key);
+        const opEl = document.querySelector(`[data-filter-op="${key}"]`);
+        const op = opEl ? opEl.value : ">";
+
+        if (Number.isNaN(target) || value === null) return false;
+        if (op === ">" && !(value > target)) return false;
+        if (op === "<" && !(value < target)) return false;
+      }
+      return true;
+    }
+
+    function applyFilters() {
+      sortedStocks = baseStocks.filter(passesFilters);
+      sortCurrentRows();
+      renderAll();
+    }
+
+    function clearFilters() {
+      const codeInput = document.getElementById("codeFilterInput");
+      if (codeInput) codeInput.value = "";
+      document.querySelectorAll("[data-filter-key]").forEach(input => input.value = "");
+      document.querySelectorAll("[data-filter-op]").forEach(select => select.value = ">");
+      applyFilters();
+    }
+
+    function bindFilters() {
+      const codeInput = document.getElementById("codeFilterInput");
+      if (codeInput) {
+        codeInput.addEventListener("input", applyFilters);
+        codeInput.addEventListener("change", applyFilters);
+      }
+
+      document.querySelectorAll("[data-filter-key]").forEach(input => {
+        input.addEventListener("input", applyFilters);
+        input.addEventListener("change", applyFilters);
+      });
+      document.querySelectorAll("[data-filter-op]").forEach(select => {
+        select.addEventListener("change", applyFilters);
+      });
+      const applyBtn = document.getElementById("applyFilterBtn");
+      const clearBtn = document.getElementById("clearFilterBtn");
+      if (applyBtn) applyBtn.addEventListener("click", applyFilters);
+      if (clearBtn) clearBtn.addEventListener("click", clearFilters);
+    }
+
+    bindTabs();
+    bindFilters();
+    renderAll();
+  </script>
+
+</body>
+
+</html>
