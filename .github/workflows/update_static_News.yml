@@ -1,9 +1,9 @@
-name: Update Static News CSV
+name: UpdateUTC7 Static News CSV
 
 on:
   schedule:
     # Taiwan 15:30 = UTC 07:30
-    - cron: "30 7 * * *"
+    - cron: "11 7 * * *"
   workflow_dispatch:
 
 jobs:
