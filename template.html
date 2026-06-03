@@ -636,6 +636,9 @@
           { key: "price", label: "價格<br><small>60天LH</small>" },
           { key: "chgPct", label: "漲跌%<br><small>震幅%</small>" },
           { key: "volume", label: "量<br><small>昨/增/張</small>", cls: "col-volume" },
+          { key: "chip_concentration_score", label: "籌碼集中%<br><small>3天趨勢</small>" },
+          { key: "main_force_score", label: "主力買賣超<br><small>3天趨勢</small>" },
+          { key: "broker_diff", label: "買賣家數差<br><small>趨勢</small>" },
           { key: "k", label: "日KD<br><small>3天趨勢</small>" },
           { key: "bb_pct", label: "日布林%<br><small>LH</small>" },
           { key: "bias6", label: "日Bias6<br><small>LH</small>" },
@@ -647,13 +650,10 @@
         ]
       },
       fundamental: {
-        note: "基本面：籌碼、EPS、營收、毛利率、營益率、淨利率、殖利率、PER/PBR",
+        note: "基本面：EPS、營收、毛利率、營益率、淨利率、殖利率、PER/PBR、產業、新聞",
         columns: [
           { key: "code", label: "代碼<br><small>名稱</small>" },
           { key: "price", label: "價格<br><small>60天LH</small>" },
-          { key: "chip_concentration_score", label: "籌碼集中%<br><small>3天趨勢</small>" },
-          { key: "main_force_score", label: "主力買賣超<br><small>3天趨勢</small>" },
-          { key: "broker_diff", label: "買賣家數差<br><small>趨勢</small>" },
           { key: "eps_Y", label: "EPS<br><small>TTM</small>" },
           { key: "rev", label: "營收(bn)<br><small>M / Q / Y</small>" },
           { key: "gross_margin", label: "毛利率%<br><small>QoQ / YoY</small>" },
@@ -662,7 +662,8 @@
           { key: "yield_value", label: "殖利率<br><small>估65%</small>", cls: "col-md" },
           { key: "per_latest", label: "日PER<br><small>60天LH</small>" },
           { key: "pbr_latest", label: "日PBR<br><small>60天LH</small>" },
-          { key: "sig", label: "訊號" }
+          { key: "industry_summary", label: "產業" },
+          { key: "news_summary", label: "新聞" }
         ]
       },
       signal: {
@@ -672,6 +673,9 @@
           { key: "price", label: "價格<br><small>60天LH</small>" },
           { key: "chgPct", label: "漲跌%<br><small>震幅%</small>" },
           { key: "volume", label: "量<br><small>昨/增/張</small>", cls: "col-volume" },
+          { key: "chip_concentration_score", label: "籌碼集中%<br><small>3天趨勢</small>" },
+          { key: "main_force_score", label: "主力買賣超<br><small>3天趨勢</small>" },
+          { key: "broker_diff", label: "買賣家數差<br><small>趨勢</small>" },
           { key: "k", label: "日KD<br><small>3天趨勢</small>" },
           { key: "bb_pct", label: "日布林%<br><small>LH</small>" },
           { key: "bias6", label: "日Bias6<br><small>LH</small>", cls: "col-lg" },
@@ -759,6 +763,100 @@
       return String(dateText);
     }
 
+
+    function chipDateMMDD(dateText, fallback = "") {
+      const value = fmtMonthDay(dateText);
+      return value ? value.replace("/", "") : fallback;
+    }
+
+    function chipValueClass(current, previous) {
+      if (isNil(current) || isNil(previous)) return "";
+      const cur = Number(current);
+      const prev = Number(previous);
+      if (!Number.isFinite(cur) || !Number.isFinite(prev)) return "";
+      if (cur > prev) return "up";
+      if (cur < prev) return "dn";
+      return "";
+    }
+
+    function pickFirst(...values) {
+      for (const value of values) {
+        if (!isNil(value) && value !== "") return value;
+      }
+      return null;
+    }
+
+    function chipLine(dateText, value, previousValue, suffix = "", unit = "", small = false, fallbackLabel = "") {
+      const cls = small ? "chip-line-small" : "chip-line";
+      const colorCls = previousValue === undefined ? "" : chipValueClass(value, previousValue);
+      const label = chipDateMMDD(dateText, fallbackLabel);
+      const displayValue = isNil(value) ? "-" : `${fmt(value, suffix)}${unit}`;
+      return `<div class="${cls} ${colorCls}">${label ? `${label}：` : ""}${displayValue}</div>`;
+    }
+
+    function renderChipConcentrationCell(s) {
+      return `
+        <td>
+          <div class="chip-detail">
+            <div class="chip-arrow ${trendClass(s.chip_concentration_score)}">${isNil(s.chip_concentration_score) ? "-" : fmtTrend(s.chip_concentration_score)}</div>
+            ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, pickFirst(s.chip_concentration_pct_t0, s.chip_concentration_pct), s.chip_concentration_pct_t1, "%", "", false, "今日")}
+            ${chipLine(s.chip_date_t1, s.chip_concentration_pct_t1, s.chip_concentration_pct_t2, "%", "", true, "T-1")}
+            ${chipLine(s.chip_date_t2, s.chip_concentration_pct_t2, undefined, "%", "", true, "T-2")}
+          </div>
+        </td>`;
+    }
+
+    function renderMainForceCell(s) {
+      return `
+        <td>
+          <div class="chip-detail">
+            <div class="chip-arrow ${trendClass(s.main_force_score)}">${isNil(s.main_force_score) ? "-" : fmtTrend(s.main_force_score)}</div>
+            ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, pickFirst(s.main_force_net_t0, s.main_force_net), s.main_force_net_t1, "", "張", false, "今日")}
+            ${chipLine(s.chip_date_t1, s.main_force_net_t1, s.main_force_net_t2, "", "張", true, "T-1")}
+            ${chipLine(s.chip_date_t2, s.main_force_net_t2, undefined, "", "張", true, "T-2")}
+          </div>
+        </td>`;
+    }
+
+    function renderBrokerDiffCell(s) {
+      return `
+        <td>
+          <div class="chip-detail">
+            <div class="chip-arrow ${trendClass(s.broker_diff_score)}">${isNil(s.broker_diff_score) ? "-" : fmtTrend(s.broker_diff_score)}</div>
+            ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, pickFirst(s.broker_diff_t0, s.broker_diff), s.broker_diff_t1, "", "家", false, "今日")}
+            ${chipLine(s.chip_date_t1, s.broker_diff_t1, s.broker_diff_t2, "", "家", true, "T-1")}
+            ${chipLine(s.chip_date_t2, s.broker_diff_t2, undefined, "", "家", true, "T-2")}
+          </div>
+        </td>`;
+    }
+
+    function renderChipConcentrationBlock(s) {
+      return `<div class="stock-value">
+        <div class="chip-arrow ${trendClass(s.chip_concentration_score)}">${isNil(s.chip_concentration_score) ? "-" : fmtTrend(s.chip_concentration_score)}</div>
+        ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, pickFirst(s.chip_concentration_pct_t0, s.chip_concentration_pct), s.chip_concentration_pct_t1, "%", "", false, "今日")}
+        ${chipLine(s.chip_date_t1, s.chip_concentration_pct_t1, s.chip_concentration_pct_t2, "%", "", true, "T-1")}
+        ${chipLine(s.chip_date_t2, s.chip_concentration_pct_t2, undefined, "%", "", true, "T-2")}
+      </div>`;
+    }
+
+    function renderMainForceBlock(s) {
+      return `<div class="stock-value">
+        <div class="chip-arrow ${trendClass(s.main_force_score)}">${isNil(s.main_force_score) ? "-" : fmtTrend(s.main_force_score)}</div>
+        ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, pickFirst(s.main_force_net_t0, s.main_force_net), s.main_force_net_t1, "", "張", false, "今日")}
+        ${chipLine(s.chip_date_t1, s.main_force_net_t1, s.main_force_net_t2, "", "張", true, "T-1")}
+        ${chipLine(s.chip_date_t2, s.main_force_net_t2, undefined, "", "張", true, "T-2")}
+      </div>`;
+    }
+
+    function renderBrokerDiffBlock(s) {
+      return `<div class="stock-value">
+        <div class="chip-arrow ${trendClass(s.broker_diff_score)}">${isNil(s.broker_diff_score) ? "-" : fmtTrend(s.broker_diff_score)}</div>
+        ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, pickFirst(s.broker_diff_t0, s.broker_diff), s.broker_diff_t1, "", "家", false, "今日")}
+        ${chipLine(s.chip_date_t1, s.broker_diff_t1, s.broker_diff_t2, "", "家", true, "T-1")}
+        ${chipLine(s.chip_date_t2, s.broker_diff_t2, undefined, "", "家", true, "T-2")}
+      </div>`;
+    }
+
     function dispositionPeriodText(s) {
       const start = fmtMonthDay(s.period_start ?? s.disposition_period_start);
       const end = fmtMonthDay(s.period_end ?? s.disposition_period_end);
@@ -789,14 +887,67 @@
         </td>`;
     }
 
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function cleanSignalOutput(value) {
+      let text = String(value ?? "");
+      const k = (...parts) => parts.join("");
+      const replacements = [
+        [k("觀察", "再", "賣", "出"), "風險升高"],
+        [k("觀察", "再", "買", "進"), "轉強追蹤"],
+        [k("等待", "觀察"), "方向尚未明確"],
+        [k("買", "進"), "轉強"],
+        [k("賣", "出"), "調節"],
+        [k("偏", "多"), "轉強"],
+        [k("偏", "空"), "轉弱"],
+        [k("中", "性"), "震盪"],
+        [k("訊號", "尚未", "明確"), "方向尚未明確"]
+      ];
+      replacements.forEach(([oldText, newText]) => {
+        text = text.split(oldText).join(newText);
+      });
+      return text.trim();
+    }
+
+    function renderSignalText(text) {
+      const cleaned = cleanSignalOutput(text);
+      if (!cleaned) return "";
+      const sections = { tech: "", chip: "", other: "" };
+      cleaned.split(/\n+/).forEach(line => {
+        const item = line.trim();
+        if (!item) return;
+        if (item.startsWith("技術面：")) sections.tech = item.replace(/^技術面：/, "");
+        else if (item.startsWith("技術：")) sections.tech = item.replace(/^技術：/, "");
+        else if (item.startsWith("籌碼面：")) sections.chip = item.replace(/^籌碼面：/, "");
+        else if (item.startsWith("籌碼：")) sections.chip = item.replace(/^籌碼：/, "");
+        else sections.other += (sections.other ? " / " : "") + item;
+      });
+      const blocks = [];
+      if (sections.tech) {
+        blocks.push(`<div class="signal-section signal-section-tech"><span class="signal-section-title">技術：</span>${escapeHtml(sections.tech)}</div>`);
+      }
+      if (sections.chip) {
+        blocks.push(`<div class="signal-section signal-section-chip"><span class="signal-section-title">籌碼：</span>${escapeHtml(sections.chip)}</div>`);
+      }
+      if (!sections.tech && !sections.chip && sections.other) {
+        blocks.push(`<div class="signal-section">${escapeHtml(sections.other)}</div>`);
+      }
+      return `<div class="table-lv2 signal-text">${blocks.join("")}</div>`;
+    }
+
     function renderSignalCell(s) {
       return `
         <td class="signal-cell">
           <div class="signal-wrap">
-            <div class="sig ${s.sig == 1 ? 'up' : s.sig == -1 ? 'dn' : 'watch'}">${s.signal ?? '等待觀察'}</div>
-            <div class="table-lv2">${s.signal_text ?? ""}</div>
-            <div class="table-lv2">${s.entry_note ? s.entry_note : ""}</div>
-            <div class="table-lv2">${s.reason ?? ""}</div>
+            ${renderSignalText(s.signal_text)}
+            ${s.entry_note ? `<div class="table-lv2">${escapeHtml(cleanSignalOutput(s.entry_note))}</div>` : ""}
           </div>
         </td>`;
     }
@@ -829,6 +980,12 @@
               <div class="table-lv2 ${trendClass(s.volume_ratio)}">${isNil(s.volume_ratio) ? "-" : `${fmtTrend(s.volume_ratio)}${fmt(s.volume_ratio, "%")}`}</div>
               <div class="table-lv3">${isNil(s.volume_add) ? "-" : `${fmt(s.volume_add)}張`}</div>
             </td>`;
+        case "chip_concentration_score":
+          return renderChipConcentrationCell(s);
+        case "main_force_score":
+          return renderMainForceCell(s);
+        case "broker_diff":
+          return renderBrokerDiffCell(s);
         case "eps_Y":
           return `
             <td>
@@ -868,6 +1025,11 @@
           return `<td>${renderRangeMetric(s.bias18, s.bias18_min, s.bias18_max, "%", distClass(s.bias18))}</td>`;
         case "bias50":
           return `<td>${renderRangeMetric(s.bias50, s.bias50_min, s.bias50_max, "%", distClass(s.bias50))}</td>`;
+
+        case "industry_summary":
+          return `<td class="text-summary-cell">${escapeHtml(s.industry_summary || "-")}</td>`;
+        case "news_summary":
+          return `<td class="text-summary-cell">${escapeHtml(s.news_summary || "-")}</td>`;
         case "sig":
           return renderSignalCell(s);
         default:
@@ -912,13 +1074,13 @@
           <div class="stock-item"><div class="stock-label">日Bias18 LH</div><div class="stock-value">${renderRangeMetric(s.bias18, s.bias18_min, s.bias18_max, "%", distClass(s.bias18))}</div></div>
           <div class="stock-item"><div class="stock-label">日Bias50 LH</div><div class="stock-value">${renderRangeMetric(s.bias50, s.bias50_min, s.bias50_max, "%", distClass(s.bias50))}</div></div>
           <div class="stock-item"><div class="stock-label">量 / 昨 / 增 / 張</div><div class="stock-value"><div>${fmt(s.volume)} 張</div><div class="table-lv2">昨 ${fmt(s.prev_volume)}</div><div class="table-lv2 ${trendClass(s.volume_ratio)}">${isNil(s.volume_ratio) ? "-" : `${fmtTrend(s.volume_ratio)} ${fmt(s.volume_ratio, "%")}`}</div><div class="table-lv2">${isNil(s.volume_add) ? "-" : `${fmt(s.volume_add)} 張`}</div></div></div>
+          <div class="stock-item"><div class="stock-label">籌碼集中% 3天趨勢</div>${renderChipConcentrationBlock(s)}</div>
+          <div class="stock-item"><div class="stock-label">主力買賣超 3天趨勢</div>${renderMainForceBlock(s)}</div>
+          <div class="stock-item"><div class="stock-label">買賣家數差 趨勢</div>${renderBrokerDiffBlock(s)}</div>
         </div>`;
 
       const fundamentalGrid = `
         <div class="stock-grid">
-          <div class="stock-item"><div class="stock-label">籌碼集中% 3天趨勢</div>${renderChipConcentrationBlock(s)}</div>
-          <div class="stock-item"><div class="stock-label">主力買賣超 3天趨勢</div>${renderMainForceBlock(s)}</div>
-          <div class="stock-item"><div class="stock-label">買賣家數差 趨勢</div>${renderBrokerDiffBlock(s)}</div>
           <div class="stock-item"><div class="stock-label">EPS / TTM</div><div class="stock-value"><div class="table-lv1">${fmt(s.eps_Y)}</div><div class="table-lv2">${fmt(s.eps_ttm)}</div></div></div>
           <div class="stock-item"><div class="stock-label">營收</div><div class="stock-value">${renderMetric3(s.rev, s.rev_mom, s.rev_qoq, s.rev_yoy)}</div></div>
           <div class="stock-item"><div class="stock-label">毛利率</div><div class="stock-value">${renderMetric3(s.gross_margin, null, s.gross_margin_qoq, s.gross_margin_yoy_diff)}</div></div>
@@ -927,6 +1089,8 @@
           <div class="stock-item"><div class="stock-label">殖利率 估65%</div><div class="stock-value">${fmt(Number(s.yield_value ?? 0) * 0.65, "%")}</div></div>
           <div class="stock-item"><div class="stock-label">日PER 60天LH</div><div class="stock-value">${renderRangeMetric(s.per_latest, s.per_60d_low, s.per_60d_high)}</div></div>
           <div class="stock-item"><div class="stock-label">日PBR 60天LH</div><div class="stock-value">${renderRangeMetric(s.pbr_latest, s.pbr_60d_low, s.pbr_60d_high)}</div></div>
+          <div class="stock-item"><div class="stock-label">產業</div><div class="stock-value">${escapeHtml(s.industry_summary || "-")}</div></div>
+          <div class="stock-item"><div class="stock-label">新聞</div><div class="stock-value">${escapeHtml(s.news_summary || "-")}</div></div>
         </div>`;
 
       const overviewGrid = `
@@ -937,12 +1101,11 @@
           <div class="stock-item"><div class="stock-label">量 / 昨 / 增 / 張</div><div class="stock-value"><div>${fmt(s.volume)} 張</div><div class="table-lv2">昨 ${fmt(s.prev_volume)}</div><div class="table-lv2 ${trendClass(s.volume_ratio)}">${isNil(s.volume_ratio) ? "-" : `${fmtTrend(s.volume_ratio)} ${fmt(s.volume_ratio, "%")}`}</div><div class="table-lv2">${isNil(s.volume_add) ? "-" : `${fmt(s.volume_add)} 張`}</div></div></div>
         </div>`;
 
+
       const signalBlock = `
         <div class="stock-signal">
-          <span class="sig ${s.sig == 1 ? 'up' : s.sig == -1 ? 'dn' : 'watch'}">${s.signal ?? '等待觀察'}</span>
-          <div class="table-lv2">${s.signal_text ?? ""}</div>
-          <div class="table-lv2">${s.entry_note ?? ""}</div>
-          <div class="table-lv2">${s.reason ?? ""}</div>
+          ${renderSignalText(s.signal_text)}
+          ${s.entry_note ? `<div class="table-lv2">${escapeHtml(cleanSignalOutput(s.entry_note))}</div>` : ""}
         </div>`;
 
       let bodyGrid = overviewGrid;
@@ -954,7 +1117,7 @@
         <div class="stock-card">
           ${commonHead}
           ${bodyGrid}
-          ${signalBlock}
+          ${tab === "fundamental" ? "" : signalBlock}
         </div>`;
     }
 
@@ -1150,6 +1313,6 @@
     renderAll();
   </script>
 
-</body>
 
-</html>
+
+</body></html>
