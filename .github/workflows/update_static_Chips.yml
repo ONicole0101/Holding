@@ -14,6 +14,8 @@ on:
         description: Parallel day requests per stock
         required: false
         default: "6"
+  schedule:
+    - cron: "11 8 * * 1-5" 
 
 permissions:
   contents: write
