@@ -1,4 +1,4 @@
-name: Update Static_Chips CSV
+name: UpdateUTC8 Static_Chips CSV
 on:
   workflow_dispatch:
     inputs:
