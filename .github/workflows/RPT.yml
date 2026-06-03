@@ -1,4 +1,4 @@
-name: 產出Report
+name: 產出UTC9 Report
 
 on:
   workflow_dispatch:
@@ -16,7 +16,7 @@ on:
         required: false
         default: ""
   schedule:
-    - cron: "0 8 * * 1-5"
+    - cron: "1 9 * * 1-5"  
 
 permissions:
   contents: write
