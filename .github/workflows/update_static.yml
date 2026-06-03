@@ -16,10 +16,8 @@ on:
         required: false
         default: "0.2"
   schedule:
-    # GitHub Actions cron uses UTC.
-    # 20:00 UTC = Taiwan time 04:00.
-    - cron: "0 20 * * *"
-
+    - cron: "11 20 * * 1-5" 
+    
 permissions:
   contents: write
 
