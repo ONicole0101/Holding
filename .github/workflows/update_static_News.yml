@@ -1,8 +1,9 @@
-name: UpdateUTC7 Static News CSV
+name: Update AllStatic News
 
 on:
   schedule:
-    - cron: "11 7 * * 1-5"
+    # Taiwan 15:30 = UTC 07:30
+    - cron: "30 7 * * *"
   workflow_dispatch:
 
 jobs:
@@ -24,24 +25,29 @@ jobs:
           python -m pip install --upgrade pip
           pip install openai
 
-      - name: Update Static_news.csv
+      - name: Update AllStatic_news.csv
         env:
-          STOCKS_CSV: ${{ vars.STOCKS_CSV || 'stocks.csv' }}
-          ALLSTATIC_NEWS_OUTPUT_FILE: ${{ vars.ALLSTATIC_NEWS_OUTPUT_FILE || 'AllStatic_news.csv' }}
+          STOCKS_CSV: stocks.csv
+          ALLSTATIC_NEWS_OUTPUT_FILE: AllStatic_news.csv
+          NEWS_CACHE_FILE: .allstatic_news_cache.json
           NEWS_DAYS: ${{ vars.NEWS_DAYS || '10' }}
-          NEWS_MAX_ITEMS: ${{ vars.NEWS_MAX_ITEMS || '12' }}
+          NEWS_MAX_ITEMS: ${{ vars.NEWS_MAX_ITEMS || '8' }}
           NEWS_SLEEP_SEC: ${{ vars.NEWS_SLEEP_SEC || '0.6' }}
-          # 預設保留既有「產業」欄，主要每天更新「新聞」。要重寫產業可設 repo variable REFRESH_INDUSTRY=1。
+          NEWS_SKIP_IF_SAME_TITLES: ${{ vars.NEWS_SKIP_IF_SAME_TITLES || '1' }}
+          INDUSTRY_SUMMARY_CHARS: ${{ vars.INDUSTRY_SUMMARY_CHARS || '150' }}
+          NEWS_SUMMARY_CHARS: ${{ vars.NEWS_SUMMARY_CHARS || '150' }}
           REFRESH_INDUSTRY: ${{ vars.REFRESH_INDUSTRY || '0' }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REFRESH_INDUSTRY_WEEKDAY: ${{ vars.REFRESH_INDUSTRY_WEEKDAY || '0' }}
+          USE_OPENAI_SUMMARY: ${{ vars.USE_OPENAI_SUMMARY || '1' }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-4o-mini' }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           python generate_static_news_service.py
 
-      - name: Commit Static_news.csv
+      - name: Commit AllStatic_news.csv and cache
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add AllStatic_news.csv
+          git add AllStatic_news.csv .allstatic_news_cache.json
           git diff --cached --quiet || git commit -m "Update AllStatic_news.csv"
           git push
