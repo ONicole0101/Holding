@@ -1,10 +1,7 @@
-[32m2026-06-05 11:35:42.754[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
-[32m2026-06-05 11:35:42.908[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
-FinMind: token=True, login=ok, usage=23/6000, remain=5977
+[32m2026-06-07 07:31:27.029[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
+[32m2026-06-07 07:31:27.194[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
+FinMind: token=True, login=ok, usage=85/6000, remain=5915
 Build chips: total=17, workers=6, trend_days=3, threshold=15, lookback_days=21, output=AllStatic_Chips.csv
-[1/17] 1532 勤美 status=ok date=2026-06-05 main=129000 diff=-58 state=neutral
-[17/17] 6515 穎崴 status=ok date=2026-06-05 main=-7870 diff=185 state=neutral
-Done: rows=17, status={'ok': 17}, elapsed=51.4s, output=AllStatic_Chips.csv
 stock_id  name chip_latest_date main_force_net broker_diff   chip_signal_state chips_status
     1101    台泥       2026-06-05        1916345          47 bullish_distributed           ok
     1216    統一       2026-06-05         266954         -98 bullish_distributed           ok
