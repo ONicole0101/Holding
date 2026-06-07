@@ -196,6 +196,43 @@
       line-height: 1.4;
     }
 
+
+    .text-summary-cell {
+      width: clamp(220px, 18vw, 420px);
+      min-width: clamp(220px, 18vw, 420px);
+      max-width: clamp(280px, 24vw, 520px);
+      white-space: normal;
+      line-height: 1.55;
+      color: #c9d1d9;
+      vertical-align: top;
+    }
+
+    .industry-summary-cell {
+      width: clamp(220px, 18vw, 420px);
+      min-width: clamp(220px, 18vw, 420px);
+      max-width: clamp(280px, 23vw, 500px);
+    }
+
+    .news-summary-cell {
+      width: clamp(260px, 24vw, 560px);
+      min-width: clamp(260px, 24vw, 560px);
+      max-width: clamp(320px, 30vw, 680px);
+    }
+
+    .summary-text {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 6;
+      overflow: hidden;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+
+    .text-summary-cell:hover .summary-text {
+      -webkit-line-clamp: unset;
+      overflow: visible;
+    }
+
     .signal-wrap {
       display: flex;
       flex-direction: column;
@@ -473,6 +510,18 @@
         width: 100%;
         margin-left: 0;
       }
+
+      .text-summary-cell {
+        width: clamp(200px, 32vw, 380px);
+        min-width: clamp(200px, 32vw, 380px);
+        max-width: clamp(240px, 42vw, 460px);
+      }
+
+      .news-summary-cell {
+        width: clamp(240px, 42vw, 520px);
+        min-width: clamp(240px, 42vw, 520px);
+        max-width: clamp(280px, 52vw, 600px);
+      }
     }
 
     @media (max-width: 640px) {
@@ -508,6 +557,21 @@
 
       .mobile-list {
         display: block;
+      }
+
+      .stock-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .stock-item.summary-mobile-item {
+        grid-column: 1 / -1;
+      }
+
+      .stock-item.summary-mobile-item .stock-value {
+        line-height: 1.55;
+        white-space: normal;
+        word-break: break-word;
+        overflow-wrap: anywhere;
       }
     }
   </style>
@@ -662,8 +726,8 @@
           { key: "yield_value", label: "殖利率<br><small>估65%</small>", cls: "col-md" },
           { key: "per_latest", label: "日PER<br><small>60天LH</small>" },
           { key: "pbr_latest", label: "日PBR<br><small>60天LH</small>" },
-          { key: "industry_summary", label: "產業" },
-          { key: "news_summary", label: "新聞" }
+          { key: "industry_summary", label: "產業", cls: "industry-summary-col" },
+          { key: "news_summary", label: "新聞", cls: "news-summary-col" }
         ]
       },
       signal: {
@@ -1027,9 +1091,9 @@
           return `<td>${renderRangeMetric(s.bias50, s.bias50_min, s.bias50_max, "%", distClass(s.bias50))}</td>`;
 
         case "industry_summary":
-          return `<td class="text-summary-cell">${escapeHtml(s.industry_summary || "-")}</td>`;
+          return `<td class="text-summary-cell industry-summary-cell"><div class="summary-text">${escapeHtml(s.industry_summary || "-")}</div></td>`;
         case "news_summary":
-          return `<td class="text-summary-cell">${escapeHtml(s.news_summary || "-")}</td>`;
+          return `<td class="text-summary-cell news-summary-cell"><div class="summary-text">${escapeHtml(s.news_summary || "-")}</div></td>`;
         case "sig":
           return renderSignalCell(s);
         default:
@@ -1089,8 +1153,8 @@
           <div class="stock-item"><div class="stock-label">殖利率 估65%</div><div class="stock-value">${fmt(Number(s.yield_value ?? 0) * 0.65, "%")}</div></div>
           <div class="stock-item"><div class="stock-label">日PER 60天LH</div><div class="stock-value">${renderRangeMetric(s.per_latest, s.per_60d_low, s.per_60d_high)}</div></div>
           <div class="stock-item"><div class="stock-label">日PBR 60天LH</div><div class="stock-value">${renderRangeMetric(s.pbr_latest, s.pbr_60d_low, s.pbr_60d_high)}</div></div>
-          <div class="stock-item"><div class="stock-label">產業</div><div class="stock-value">${escapeHtml(s.industry_summary || "-")}</div></div>
-          <div class="stock-item"><div class="stock-label">新聞</div><div class="stock-value">${escapeHtml(s.news_summary || "-")}</div></div>
+          <div class="stock-item summary-mobile-item"><div class="stock-label">產業</div><div class="stock-value">${escapeHtml(s.industry_summary || "-")}</div></div>
+          <div class="stock-item summary-mobile-item"><div class="stock-label">新聞</div><div class="stock-value">${escapeHtml(s.news_summary || "-")}</div></div>
         </div>`;
 
       const overviewGrid = `
