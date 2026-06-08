@@ -197,3 +197,182 @@ def safe_pos(value, low, high):
     if value is None or low is None or high is None or high == low:
         return None
     return (value - low) / (high - low)
+
+
+
+def get_support_resistance_levels(df, lookback_days=120, pivot_window=5, tolerance_pct=1.2):
+    """
+    Use FinMind TaiwanStockPrice OHLCV data to estimate nearby resistance/support.
+
+    Logic:
+    - Use recent OHLCV rows only, default last 120 trading days.
+    - Find swing highs as resistance candidates and swing lows as support candidates.
+    - Merge nearby prices into clusters by tolerance_pct so repeated tests become one level.
+    - Pick the nearest cluster above latest close as resistance, and nearest cluster below latest close as support.
+
+    Returned prices are rounded to 2 decimals and safe for JSON/template rendering.
+    """
+    empty = {
+        "resistance_price": None,
+        "support_price": None,
+        "resistance_distance_pct": None,
+        "support_distance_pct": None,
+        "resistance_touch_count": None,
+        "support_touch_count": None,
+    }
+
+    def _safe_float(value):
+        try:
+            if pd.isna(value):
+                return None
+            return float(value)
+        except Exception:
+            return None
+
+    def _round_or_none(value, ndigits=2):
+        value = _safe_float(value)
+        if value is None:
+            return None
+        return round(value, ndigits)
+
+    def _cluster_levels(levels, tolerance):
+        """Cluster close prices and return weighted-average levels."""
+        if not levels:
+            return []
+
+        levels = sorted(levels, key=lambda x: x["price"])
+        clusters = []
+
+        for item in levels:
+            price = item["price"]
+            weight = max(float(item.get("weight") or 1), 1.0)
+            if not clusters:
+                clusters.append({
+                    "prices": [price],
+                    "weights": [weight],
+                    "dates": [item.get("date")],
+                })
+                continue
+
+            cluster = clusters[-1]
+            avg = sum(p * w for p, w in zip(cluster["prices"], cluster["weights"])) / sum(cluster["weights"])
+            if avg and abs(price - avg) / avg <= tolerance:
+                cluster["prices"].append(price)
+                cluster["weights"].append(weight)
+                cluster["dates"].append(item.get("date"))
+            else:
+                clusters.append({
+                    "prices": [price],
+                    "weights": [weight],
+                    "dates": [item.get("date")],
+                })
+
+        result = []
+        for cluster in clusters:
+            weight_sum = sum(cluster["weights"])
+            avg_price = sum(p * w for p, w in zip(cluster["prices"], cluster["weights"])) / weight_sum
+            result.append({
+                "price": avg_price,
+                "touch_count": len(cluster["prices"]),
+                "weight": weight_sum,
+                "last_date": max([d for d in cluster["dates"] if d is not None], default=None),
+            })
+        return result
+
+    try:
+        if df is None or df.empty:
+            return empty
+        required = {"close", "max", "min"}
+        if not required.issubset(df.columns):
+            return empty
+
+        data = df.copy()
+        if "date" in data.columns:
+            data["date"] = pd.to_datetime(data["date"], errors="coerce")
+            data = data.sort_values("date")
+
+        for col in ["close", "max", "min", "volume"]:
+            if col in data.columns:
+                data[col] = pd.to_numeric(data[col], errors="coerce")
+
+        data = data.dropna(subset=["close", "max", "min"])
+        if data.empty:
+            return empty
+
+        window = data.tail(max(int(lookback_days or 120), 20)).copy()
+        if window.empty:
+            return empty
+
+        latest_close = _safe_float(window["close"].iloc[-1])
+        if latest_close is None or latest_close <= 0:
+            return empty
+
+        pivot_window = max(int(pivot_window or 5), 3)
+        if pivot_window % 2 == 0:
+            pivot_window += 1
+        tolerance = max(float(tolerance_pct or 1.2), 0.1) / 100
+
+        high_roll = window["max"].rolling(pivot_window, center=True, min_periods=3).max()
+        low_roll = window["min"].rolling(pivot_window, center=True, min_periods=3).min()
+        pivot_highs = window[window["max"].eq(high_roll)].copy()
+        pivot_lows = window[window["min"].eq(low_roll)].copy()
+
+        resistance_candidates = []
+        support_candidates = []
+
+        def _append_candidate(target, row, price_col):
+            price = _safe_float(row.get(price_col))
+            if price is None or price <= 0:
+                return
+            volume = _safe_float(row.get("volume")) if "volume" in row.index else None
+            date_value = row.get("date") if "date" in row.index else None
+            target.append({
+                "price": price,
+                "weight": volume if volume and volume > 0 else 1,
+                "date": date_value,
+            })
+
+        for _, row in pivot_highs.iterrows():
+            price = _safe_float(row.get("max"))
+            if price is not None and price >= latest_close:
+                _append_candidate(resistance_candidates, row, "max")
+
+        for _, row in pivot_lows.iterrows():
+            price = _safe_float(row.get("min"))
+            if price is not None and price <= latest_close:
+                _append_candidate(support_candidates, row, "min")
+
+        # Add recent range extremes as fallbacks so the fields still work when few pivots exist.
+        high_60 = _safe_float(window.tail(60)["max"].max())
+        low_60 = _safe_float(window.tail(60)["min"].min())
+        if high_60 is not None and high_60 >= latest_close:
+            resistance_candidates.append({"price": high_60, "weight": 1, "date": None})
+        if low_60 is not None and low_60 <= latest_close:
+            support_candidates.append({"price": low_60, "weight": 1, "date": None})
+
+        resistance_clusters = [c for c in _cluster_levels(resistance_candidates, tolerance) if c["price"] >= latest_close]
+        support_clusters = [c for c in _cluster_levels(support_candidates, tolerance) if c["price"] <= latest_close]
+
+        resistance = min(resistance_clusters, key=lambda c: (c["price"] - latest_close, -c["touch_count"]), default=None)
+        support = max(support_clusters, key=lambda c: (c["price"], c["touch_count"]), default=None)
+
+        result = empty.copy()
+        if resistance:
+            rp = resistance["price"]
+            result.update({
+                "resistance_price": _round_or_none(rp),
+                "resistance_distance_pct": _round_or_none((rp - latest_close) / latest_close * 100),
+                "resistance_touch_count": int(resistance.get("touch_count") or 0),
+            })
+        if support:
+            sp = support["price"]
+            result.update({
+                "support_price": _round_or_none(sp),
+                "support_distance_pct": _round_or_none((latest_close - sp) / latest_close * 100),
+                "support_touch_count": int(support.get("touch_count") or 0),
+            })
+        return result
+
+    except Exception as e:
+        print(f"❌ support/resistance error: {e}")
+        return empty

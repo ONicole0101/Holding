@@ -483,6 +483,49 @@
       padding-right: 4px;
     }
 
+
+    thead th[data-tooltip]::before {
+      content: "ⓘ";
+      display: inline-block;
+      margin-left: 4px;
+      color: #58a6ff;
+      font-size: 11px;
+      vertical-align: top;
+    }
+
+    thead th[data-tooltip]::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(320px, 70vw);
+      padding: 8px 10px;
+      border: 1px solid #58a6ff66;
+      border-radius: 8px;
+      background: #0d1117;
+      color: #e6edf3;
+      box-shadow: 0 8px 24px #0008;
+      white-space: normal;
+      line-height: 1.45;
+      text-align: left;
+      font-size: 12px;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      z-index: 900;
+    }
+
+    thead th[data-tooltip]:hover::after,
+    thead th[data-tooltip]:focus::after {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .sr-price-cell .table-lv2 {
+      color: #8b949e;
+    }
+
     @media (max-width: 1024px) {
       .container {
         padding: 12px;
@@ -694,15 +737,17 @@
         ]
       },
       technical: {
-        note: "技術面：價格、KD、布林、Bias、PER/PBR 60天區間",
+        note: "技術面：壓力/支撐、籌碼、KD、布林、Bias、PER/PBR 60天區間",
         columns: [
           { key: "code", label: "代碼<br><small>名稱</small>" },
           { key: "price", label: "價格<br><small>60天LH</small>" },
+          { key: "resistance_price", label: "壓力點<br><small>距離%</small>" },
+          { key: "support_price", label: "支撐點<br><small>距離%</small>" },
           { key: "chgPct", label: "漲跌%<br><small>震幅%</small>" },
           { key: "volume", label: "量<br><small>昨/增/張</small>", cls: "col-volume" },
-          { key: "chip_concentration_score", label: "籌碼集中%<br><small>3天趨勢</small>" },
-          { key: "main_force_score", label: "主力買賣超<br><small>3天趨勢</small>" },
-          { key: "broker_diff", label: "買賣家數差<br><small>趨勢</small>" },
+          { key: "chip_concentration_score", label: "籌碼集中%<br><small>3天趨勢</small>", tooltip: "籌碼集中%＝主力分點淨買賣力道的絕對值 ÷ 全市場買賣量合計 × 100。數值越高代表籌碼越集中；需搭配主力買賣超正負方向判斷。" },
+          { key: "main_force_score", label: "主力買賣超<br><small>3天趨勢</small>", tooltip: "主力買賣超＝前15大買超分點淨買超 + 前15大賣超分點淨賣超。正值偏主力買進，負值偏主力賣出。" },
+          { key: "broker_diff", label: "買賣家數差<br><small>趨勢</small>", tooltip: "買賣家數差＝有買進的券商分點家數 - 有賣出的券商分點家數。正值代表參與買方家數較多，負值代表買方較集中或賣方家數較多。" },
           { key: "k", label: "日KD<br><small>3天趨勢</small>" },
           { key: "bb_pct", label: "日布林%<br><small>LH</small>" },
           { key: "bias6", label: "日Bias6<br><small>LH</small>" },
@@ -1022,6 +1067,10 @@
           return renderCodeCell(s);
         case "price":
           return `<td>${renderRangeMetric(s.price, s.price_60d_low, s.price_60d_high)}</td>`;
+        case "resistance_price":
+          return `<td class="sr-price-cell"><div class="table-lv1 text-red">${fmt(s.resistance_price)}</div><div class="table-lv2">${isNil(s.resistance_distance_pct) ? "-" : `+${fmt(s.resistance_distance_pct, "%")}`}</div></td>`;
+        case "support_price":
+          return `<td class="sr-price-cell"><div class="table-lv1 text-green">${fmt(s.support_price)}</div><div class="table-lv2">${isNil(s.support_distance_pct) ? "-" : `-${fmt(s.support_distance_pct, "%")}`}</div></td>`;
         case "chg":
           return `
             <td>
@@ -1105,7 +1154,7 @@
       const columns = TAB_CONFIG[currentTab].columns;
       document.getElementById("stockHead").innerHTML = `
         <tr>
-          ${columns.map(col => `<th class="${col.cls ?? ""}" data-key="${col.key}">${col.label}</th>`).join("")}
+          ${columns.map(col => `<th class="${col.cls ?? ""}" data-key="${col.key}"${col.tooltip ? ` data-tooltip="${escapeHtml(col.tooltip)}" tabindex="0"` : ""}>${col.label}</th>`).join("")}
         </tr>`;
       bindSorting();
       updateSortIndicators();
@@ -1138,6 +1187,8 @@
           <div class="stock-item"><div class="stock-label">日Bias18 LH</div><div class="stock-value">${renderRangeMetric(s.bias18, s.bias18_min, s.bias18_max, "%", distClass(s.bias18))}</div></div>
           <div class="stock-item"><div class="stock-label">日Bias50 LH</div><div class="stock-value">${renderRangeMetric(s.bias50, s.bias50_min, s.bias50_max, "%", distClass(s.bias50))}</div></div>
           <div class="stock-item"><div class="stock-label">量 / 昨 / 增 / 張</div><div class="stock-value"><div>${fmt(s.volume)} 張</div><div class="table-lv2">昨 ${fmt(s.prev_volume)}</div><div class="table-lv2 ${trendClass(s.volume_ratio)}">${isNil(s.volume_ratio) ? "-" : `${fmtTrend(s.volume_ratio)} ${fmt(s.volume_ratio, "%")}`}</div><div class="table-lv2">${isNil(s.volume_add) ? "-" : `${fmt(s.volume_add)} 張`}</div></div></div>
+          <div class="stock-item"><div class="stock-label">壓力點 / 距離</div><div class="stock-value"><div class="table-lv1 text-red">${fmt(s.resistance_price)}</div><div class="table-lv2">${isNil(s.resistance_distance_pct) ? "-" : `+${fmt(s.resistance_distance_pct, "%")}`}</div></div></div>
+          <div class="stock-item"><div class="stock-label">支撐點 / 距離</div><div class="stock-value"><div class="table-lv1 text-green">${fmt(s.support_price)}</div><div class="table-lv2">${isNil(s.support_distance_pct) ? "-" : `-${fmt(s.support_distance_pct, "%")}`}</div></div></div>
           <div class="stock-item"><div class="stock-label">籌碼集中% 3天趨勢</div>${renderChipConcentrationBlock(s)}</div>
           <div class="stock-item"><div class="stock-label">主力買賣超 3天趨勢</div>${renderMainForceBlock(s)}</div>
           <div class="stock-item"><div class="stock-label">買賣家數差 趨勢</div>${renderBrokerDiffBlock(s)}</div>

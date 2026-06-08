@@ -10,7 +10,7 @@ from financial_analysis import (
     get_dividend_yield,
 )
 from signals import get_tech_signal
-from technical_indicators import add_indicators, get_kd_trend, get_bb_trend, get_MABias
+from technical_indicators import add_indicators, get_kd_trend, get_bb_trend, get_MABias, get_support_resistance_levels
 
 
 STATIC_CSV_PATH = os.getenv("STATIC_CSV_FILE", "AllStatic.csv")
@@ -212,6 +212,10 @@ def process_stock(s, static_map=None, chips_map=None, news_map=None):
         "signal_text": "資料異常",
         "reason": "",
         "entry_note": "",
+        "resistance_price": None,
+        "support_price": None,
+        "resistance_distance_pct": None,
+        "support_distance_pct": None,
     }
 
     static_row = (static_map or {}).get(stock_id, {})
@@ -260,6 +264,7 @@ def process_stock(s, static_map=None, chips_map=None, news_map=None):
         df = add_indicators(df)
         latest, prev = df.iloc[-1], df.iloc[-2]
         price_stats = get_price_60d_high_low(df)
+        support_resistance = get_support_resistance_levels(df)
         max_price = latest["max"]
         min_price = latest["min"]
         chg = latest["close"] - prev["close"]
@@ -475,6 +480,12 @@ def process_stock(s, static_map=None, chips_map=None, news_map=None):
             "price_min": float(round(min_price, 2)),
             "price_60d_high": price_stats.get("price_60d_high"),
             "price_60d_low": price_stats.get("price_60d_low"),
+            "resistance_price": support_resistance.get("resistance_price"),
+            "support_price": support_resistance.get("support_price"),
+            "resistance_distance_pct": support_resistance.get("resistance_distance_pct"),
+            "support_distance_pct": support_resistance.get("support_distance_pct"),
+            "resistance_touch_count": support_resistance.get("resistance_touch_count"),
+            "support_touch_count": support_resistance.get("support_touch_count"),
             "chg": float(round(chg, 2)),
             "chgPct": float(chgPct),
             "amp": float(amp),
