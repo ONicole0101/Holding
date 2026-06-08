@@ -1,4 +1,4 @@
-name: 產出UTC9 Report
+name: 產出UTC7 Report
 
 on:
   workflow_dispatch:
