@@ -1,24 +1,27 @@
-[32m2026-06-07 07:31:27.029[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
-[32m2026-06-07 07:31:27.194[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
-FinMind: token=True, login=ok, usage=85/6000, remain=5915
+[32m2026-06-08 11:18:59.037[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
+[32m2026-06-08 11:18:59.153[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
+FinMind: token=True, login=ok, usage=0/6000, remain=6000
 Build chips: total=17, workers=6, trend_days=3, threshold=15, lookback_days=21, output=AllStatic_Chips.csv
+[1/17] 1532 勤美 status=ok date=2026-06-08 main=-6907 diff=2 state=neutral
+[17/17] 6515 穎崴 status=ok date=2026-06-08 main=-6338 diff=195 state=neutral
+Done: rows=17, status={'ok': 17}, elapsed=41.1s, output=AllStatic_Chips.csv
 stock_id  name chip_latest_date main_force_net broker_diff   chip_signal_state chips_status
-    1101    台泥       2026-06-05        1916345          47 bullish_distributed           ok
-    1216    統一       2026-06-05         266954         -98 bullish_distributed           ok
-    1319    東陽       2026-06-05        2357983         -57             neutral           ok
-    1532    勤美       2026-06-05         129000         -58             neutral           ok
-    2317    鴻海       2026-06-05       -2404390           2             neutral           ok
-    2330   台積電       2026-06-05       -6062493          15             neutral           ok
-    2881   富邦金       2026-06-05        2708869        -130             neutral           ok
-    2885   元大金       2026-06-05       -3504496         -44             bearish           ok
-    2891   中信金       2026-06-05       -5987941          87             neutral           ok
-    3017    奇鋐       2026-06-05        -165738         108             neutral           ok
-    3324    雙鴻       2026-06-05        -486428         138             neutral           ok
-    3563    牧德       2026-06-05         -25168         275             neutral           ok
-    3653    健策       2026-06-05         -21483         221 bearish_distributed           ok
-    5871 中租-KY       2026-06-05        3830048          15 bullish_distributed           ok
-    6510    精測       2026-06-05        -150649         289             neutral           ok
-    6515    穎崴       2026-06-05          -7870         185             neutral           ok
-    7728  光焱科技       2026-06-05           3000         -13 bullish_distributed           ok
+    1101    台泥       2026-06-08        1494657         152 bullish_distributed           ok
+    1216    統一       2026-06-08         -10771           7             neutral           ok
+    1319    東陽       2026-06-08        1045487         -27             neutral           ok
+    1532    勤美       2026-06-08          -6907           2             neutral           ok
+    2317    鴻海       2026-06-08       -2443209           2 bearish_distributed           ok
+    2330   台積電       2026-06-08       -2723684           7 bearish_distributed           ok
+    2881   富邦金       2026-06-08        7957506         -33             neutral           ok
+    2885   元大金       2026-06-08       -1356652         165             bearish           ok
+    2891   中信金       2026-06-08       -1753535          53 bearish_distributed           ok
+    3017    奇鋐       2026-06-08        -101802         104 bearish_distributed           ok
+    3324    雙鴻       2026-06-08          -4805         100 bearish_distributed           ok
+    3563    牧德       2026-06-08          -5000         259 bearish_distributed           ok
+    3653    健策       2026-06-08          19459          29             neutral           ok
+    5871 中租-KY       2026-06-08        4281858          17 bullish_distributed           ok
+    6510    精測       2026-06-08          50063        -161             neutral           ok
+    6515    穎崴       2026-06-08          -6338         195             neutral           ok
+    7728  光焱科技       2026-06-08           1000          66 bullish_distributed           ok
 rows= 17
 status= {'ok': 17}
