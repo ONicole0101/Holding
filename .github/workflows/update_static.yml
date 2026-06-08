@@ -1,4 +1,4 @@
-name: UpdateUTC18 Static CSV
+name: UpdateUTC16 Static CSV
 
 on:
   workflow_dispatch:
