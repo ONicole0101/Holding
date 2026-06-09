@@ -526,6 +526,20 @@
       color: #8b949e;
     }
 
+    .sr-price-cell {
+      cursor: help;
+    }
+
+    .disposition-period {
+      margin-top: 2px;
+      line-height: 1.3;
+      white-space: normal;
+    }
+
+    .disposition-period div {
+      white-space: nowrap;
+    }
+
     @media (max-width: 1024px) {
       .container {
         padding: 12px;
@@ -728,7 +742,7 @@
           { key: "code", label: "代碼<br><small>名稱</small>" },
           { key: "price", label: "價格<br><small>60天LH</small>" },
           { key: "chg", label: "漲跌<br><small>LH</small>" },
-          { key: "chgPct", label: "漲跌%<br><small>震幅%</small>" },
+          { key: "chgPct", label: "漲跌%<br><small>震幅%LH</small>" },
           { key: "volume", label: "量<br><small>昨/增/張</small>", cls: "col-volume" },
           { key: "eps_Y", label: "EPS<br><small>TTM</small>", cls: "col-lg" },
           { key: "k", label: "日KD<br><small>3天趨勢</small>" },
@@ -741,9 +755,9 @@
         columns: [
           { key: "code", label: "代碼<br><small>名稱</small>" },
           { key: "price", label: "價格<br><small>60天LH</small>" },
-          { key: "resistance_price", label: "壓力點<br><small>距離%</small>" },
-          { key: "support_price", label: "支撐點<br><small>距離%</small>" },
-          { key: "chgPct", label: "漲跌%<br><small>震幅%</small>" },
+          { key: "resistance_price", label: "壓力點<br><small>距離%</small>", tooltip: "壓力點距離%＝(壓力點價格 - 目前收盤價) ÷ 目前收盤價 × 100。數值越小代表越接近上方壓力，突破後可能轉為支撐。" },
+          { key: "support_price", label: "支撐點<br><small>距離%</small>", tooltip: "支撐點距離%＝(目前收盤價 - 支撐點價格) ÷ 目前收盤價 × 100。數值越小代表越接近下方支撐，跌破後可能轉為壓力。" },
+          { key: "chgPct", label: "漲跌%<br><small>震幅%LH</small>" },
           { key: "volume", label: "量<br><small>昨/增/張</small>", cls: "col-volume" },
           { key: "chip_concentration_score", label: "籌碼集中%<br><small>3天趨勢</small>", tooltip: "籌碼集中%＝主力分點淨買賣力道的絕對值 ÷ 全市場買賣量合計 × 100。數值越高代表籌碼越集中；需搭配主力買賣超正負方向判斷。" },
           { key: "main_force_score", label: "主力買賣超<br><small>3天趨勢</small>", tooltip: "主力買賣超＝前15大買超分點淨買超 + 前15大賣超分點淨賣超。正值偏主力買進，負值偏主力賣出。" },
@@ -780,7 +794,7 @@
         columns: [
           { key: "code", label: "代碼<br><small>名稱</small>" },
           { key: "price", label: "價格<br><small>60天LH</small>" },
-          { key: "chgPct", label: "漲跌%<br><small>震幅%</small>" },
+          { key: "chgPct", label: "漲跌%<br><small>震幅%LH</small>" },
           { key: "volume", label: "量<br><small>昨/增/張</small>", cls: "col-volume" },
           { key: "chip_concentration_score", label: "籌碼集中%<br><small>3天趨勢</small>" },
           { key: "main_force_score", label: "主力買賣超<br><small>3天趨勢</small>" },
@@ -856,6 +870,21 @@
         <div class="table-lv2">${fmt(low, suffix)}</div>
         <div class="table-lv2">${fmt(high, suffix)}</div>
       </div>`;
+    }
+
+    function supportResistanceTooltip(type) {
+      if (type === "resistance") {
+        return "壓力點距離%＝(壓力點價格 - 目前收盤價) ÷ 目前收盤價 × 100。數值越小代表越接近上方壓力。";
+      }
+      return "支撐點距離%＝(目前收盤價 - 支撐點價格) ÷ 目前收盤價 × 100。數值越小代表越接近下方支撐。";
+    }
+
+    function renderChangePctBlock(s) {
+      return `
+        <div class="table-lv1 ${chgClass(s)}">${chgSign(s)}${fmt(s.chgPct, "%")}</div>
+        <div class="table-lv2">震幅 ${fmt(s.amp, "%")}</div>
+        <div class="table-lv2">${fmt(s.price_min)}</div>
+        <div class="table-lv2">${fmt(s.price_max)}</div>`;
     }
 
     function distClass(val) {
@@ -966,11 +995,11 @@
       </div>`;
     }
 
-    function dispositionPeriodText(s) {
+    function dispositionPeriodHtml(s) {
       const start = fmtMonthDay(s.period_start ?? s.disposition_period_start);
       const end = fmtMonthDay(s.period_end ?? s.disposition_period_end);
       if (!start || !end) return "";
-      return `${start}-${end}`;
+      return `<div> ${escapeHtml(start)}</div><div>${escapeHtml(end)}</div>`;
     }
 
     function shortName(name) {
@@ -987,12 +1016,12 @@
     }
 
     function renderCodeCell(s) {
-      const dispositionText = dispositionPeriodText(s);
+      const dispositionHtml = dispositionPeriodHtml(s);
       return `
         <td>
           <div class="table-lv1">${s.code ?? ""}</div>
           <div class="table-lv2">${shortName(s.name)}</div>
-          ${dispositionText ? `<div class="table-lv3 text-red">${dispositionText}</div>` : ""}
+          ${dispositionHtml ? `<div class="table-lv3 text-red disposition-period">${dispositionHtml}</div>` : ""}
         </td>`;
     }
 
@@ -1068,9 +1097,9 @@
         case "price":
           return `<td>${renderRangeMetric(s.price, s.price_60d_low, s.price_60d_high)}</td>`;
         case "resistance_price":
-          return `<td class="sr-price-cell"><div class="table-lv1 text-red">${fmt(s.resistance_price)}</div><div class="table-lv2">${isNil(s.resistance_distance_pct) ? "-" : `+${fmt(s.resistance_distance_pct, "%")}`}</div></td>`;
+          return `<td class="sr-price-cell" title="${escapeHtml(supportResistanceTooltip("resistance"))}"><div class="table-lv1 text-red">${fmt(s.resistance_price)}</div><div class="table-lv2">${isNil(s.resistance_distance_pct) ? "-" : `+${fmt(s.resistance_distance_pct, "%")}`}</div></td>`;
         case "support_price":
-          return `<td class="sr-price-cell"><div class="table-lv1 text-green">${fmt(s.support_price)}</div><div class="table-lv2">${isNil(s.support_distance_pct) ? "-" : `-${fmt(s.support_distance_pct, "%")}`}</div></td>`;
+          return `<td class="sr-price-cell" title="${escapeHtml(supportResistanceTooltip("support"))}"><div class="table-lv1 text-green">${fmt(s.support_price)}</div><div class="table-lv2">${isNil(s.support_distance_pct) ? "-" : `-${fmt(s.support_distance_pct, "%")}`}</div></td>`;
         case "chg":
           return `
             <td>
@@ -1082,8 +1111,7 @@
         case "chgPct":
           return `
             <td>
-              <div class="table-lv1 ${chgClass(s)}">${chgSign(s)}${fmt(s.chgPct, "%")}</div>
-              <div class="table-lv2">${fmt(s.amp, "%")}</div>
+              ${renderChangePctBlock(s)}
             </td>`;
         case "volume":
           return `
@@ -1166,14 +1194,14 @@
     }
 
     function renderMobileCard(s) {
-      const dispositionText = dispositionPeriodText(s);
+      const dispositionHtml = dispositionPeriodHtml(s);
       const tab = currentTab;
 
       const commonHead = `
         <div class="stock-head">
           <div>
             <div class="table-lv1"><b>${shortName(s.name)} (${s.code ?? ""})</b></div>
-            ${dispositionText ? `<div class="table-lv3 text-red">${dispositionText}</div>` : ""}
+            ${dispositionHtml ? `<div class="table-lv3 text-red disposition-period">${dispositionHtml}</div>` : ""}
             <div class="table-lv2 ${chgClass(s)}">${chgSign(s)}${fmt(s.chg)} / ${chgSign(s)}${fmt(s.chgPct, "%")}</div>
           </div>
           <div class="stock-value">${renderRangeMetric(s.price, s.price_60d_low, s.price_60d_high)}</div>
@@ -1181,6 +1209,7 @@
 
       const technicalGrid = `
         <div class="stock-grid">
+          <div class="stock-item"><div class="stock-label">漲跌% / 震幅% LH</div><div class="stock-value">${renderChangePctBlock(s)}</div></div>
           <div class="stock-item"><div class="stock-label">日KD 3天趨勢</div><div class="stock-value"><div class="table-lv1 ${trendClass(s.kd_score)}">${fmtTrend(s.kd_score)}</div><div class="table-lv2">K ${fmt(s.k)} / D ${fmt(s.d)}</div></div></div>
           <div class="stock-item"><div class="stock-label">日布林% LH</div><div class="stock-value"><div class="table-lv1 ${trendClass(s.bb_score)}">${fmtTrend(s.bb_score)}</div>${renderRangeMetric(s.bb_pct, s.bb_lower, s.bb_upper)}</div></div>
           <div class="stock-item"><div class="stock-label">日Bias6 LH</div><div class="stock-value">${renderRangeMetric(s.bias6, s.bias6_min, s.bias6_max, "%", distClass(s.bias6))}</div></div>
@@ -1196,6 +1225,7 @@
 
       const fundamentalGrid = `
         <div class="stock-grid">
+          <div class="stock-item"><div class="stock-label">漲跌% / 震幅% LH</div><div class="stock-value">${renderChangePctBlock(s)}</div></div>
           <div class="stock-item"><div class="stock-label">EPS / TTM</div><div class="stock-value"><div class="table-lv1">${fmt(s.eps_Y)}</div><div class="table-lv2">${fmt(s.eps_ttm)}</div></div></div>
           <div class="stock-item"><div class="stock-label">營收</div><div class="stock-value">${renderMetric3(s.rev, s.rev_mom, s.rev_qoq, s.rev_yoy)}</div></div>
           <div class="stock-item"><div class="stock-label">毛利率</div><div class="stock-value">${renderMetric3(s.gross_margin, null, s.gross_margin_qoq, s.gross_margin_yoy_diff)}</div></div>
