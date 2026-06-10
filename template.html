@@ -855,7 +855,7 @@
     function chipLine(dateText, value, previousValue, suffix = "", unit = "", small = false, fallbackLabel = "") {
       const cls = small ? "chip-line-small" : "chip-line";
       const colorCls = previousValue === undefined ? "" : chipValueClass(value, previousValue);
-      const label = small ? chipDateMMDD(dateText, fallbackLabel) : "";
+      const label = chipDateMMDD(dateText, fallbackLabel);
       const displayValue = isNil(value) ? "-" : `${fmt(value, suffix)}${unit}`;
       return `<div class="${cls} ${colorCls}">${label ? `${label}：` : ""}${displayValue}</div>`;
     }
@@ -870,15 +870,17 @@
         s[`k_date_t${idx}`],
         s[`date_t${idx}`],
         s[`price_date_t${idx}`],
-        s[`chip_date_t${idx}`]
+        s[`chip_date_t${idx}`],
+        s[`date${idx}`],
+        s[`k_date${idx}`]
       );
       return chipDateMMDD(value, idx === 1 ? "T-1" : idx === 2 ? "T-2" : "");
     }
 
     function kdValue(s, idx) {
       if (idx === 0) return pickFirst(s.k_t0, s.kd_k_t0, s.k);
-      if (idx === 1) return pickFirst(s.k_t1, s.kd_k_t1, s.prev_k, s.k_prev, s.k_t_1);
-      if (idx === 2) return pickFirst(s.k_t2, s.kd_k_t2, s.prev2_k, s.k_prev2, s.k_t_2);
+      if (idx === 1) return pickFirst(s.k_t1, s.kd_k_t1, s.prev_k, s.k_prev, s.k_t_1, s.K_t1, s.k1);
+      if (idx === 2) return pickFirst(s.k_t2, s.kd_k_t2, s.prev2_k, s.k_prev2, s.k_t_2, s.K_t2, s.k2);
       return null;
     }
 
@@ -922,7 +924,7 @@
         <td>
           <div class="chip-detail">
             <div class="chip-arrow ${trendClass(s.chip_concentration_score)}">${isNil(s.chip_concentration_score) ? "-" : fmtTrend(s.chip_concentration_score)}</div>
-            ${chipLine("", pickFirst(s.chip_concentration_pct_t0, s.chip_concentration_pct), s.chip_concentration_pct_t1, "%", "", false, "")}
+            ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, pickFirst(s.chip_concentration_pct_t0, s.chip_concentration_pct), s.chip_concentration_pct_t1, "%", "", false, "今日")}
             ${chipLine(s.chip_date_t1, s.chip_concentration_pct_t1, s.chip_concentration_pct_t2, "%", "", true, "T-1")}
             ${chipLine(s.chip_date_t2, s.chip_concentration_pct_t2, undefined, "%", "", true, "T-2")}
           </div>
@@ -934,7 +936,7 @@
         <td>
           <div class="chip-detail">
             <div class="chip-arrow ${trendClass(s.main_force_score)}">${isNil(s.main_force_score) ? "-" : fmtTrend(s.main_force_score)}</div>
-            ${chipLine("", pickFirst(s.main_force_net_t0, s.main_force_net), s.main_force_net_t1, "", "張", false, "")}
+            ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, pickFirst(s.main_force_net_t0, s.main_force_net), s.main_force_net_t1, "", "張", false, "今日")}
             ${chipLine(s.chip_date_t1, s.main_force_net_t1, s.main_force_net_t2, "", "張", true, "T-1")}
             ${chipLine(s.chip_date_t2, s.main_force_net_t2, undefined, "", "張", true, "T-2")}
           </div>
@@ -946,7 +948,7 @@
         <td>
           <div class="chip-detail">
             <div class="chip-arrow ${trendClass(s.broker_diff_score)}">${isNil(s.broker_diff_score) ? "-" : fmtTrend(s.broker_diff_score)}</div>
-            ${chipLine("", pickFirst(s.broker_diff_t0, s.broker_diff), s.broker_diff_t1, "", "家", false, "")}
+            ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, pickFirst(s.broker_diff_t0, s.broker_diff), s.broker_diff_t1, "", "家", false, "今日")}
             ${chipLine(s.chip_date_t1, s.broker_diff_t1, s.broker_diff_t2, "", "家", true, "T-1")}
             ${chipLine(s.chip_date_t2, s.broker_diff_t2, undefined, "", "家", true, "T-2")}
           </div>
@@ -956,7 +958,7 @@
     function renderChipConcentrationBlock(s) {
       return `<div class="stock-value">
         <div class="chip-arrow ${trendClass(s.chip_concentration_score)}">${isNil(s.chip_concentration_score) ? "-" : fmtTrend(s.chip_concentration_score)}</div>
-        ${chipLine("", pickFirst(s.chip_concentration_pct_t0, s.chip_concentration_pct), s.chip_concentration_pct_t1, "%", "", false, "")}
+        ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, pickFirst(s.chip_concentration_pct_t0, s.chip_concentration_pct), s.chip_concentration_pct_t1, "%", "", false, "今日")}
         ${chipLine(s.chip_date_t1, s.chip_concentration_pct_t1, s.chip_concentration_pct_t2, "%", "", true, "T-1")}
         ${chipLine(s.chip_date_t2, s.chip_concentration_pct_t2, undefined, "%", "", true, "T-2")}
       </div>`;
@@ -965,7 +967,7 @@
     function renderMainForceBlock(s) {
       return `<div class="stock-value">
         <div class="chip-arrow ${trendClass(s.main_force_score)}">${isNil(s.main_force_score) ? "-" : fmtTrend(s.main_force_score)}</div>
-        ${chipLine("", pickFirst(s.main_force_net_t0, s.main_force_net), s.main_force_net_t1, "", "張", false, "")}
+        ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, pickFirst(s.main_force_net_t0, s.main_force_net), s.main_force_net_t1, "", "張", false, "今日")}
         ${chipLine(s.chip_date_t1, s.main_force_net_t1, s.main_force_net_t2, "", "張", true, "T-1")}
         ${chipLine(s.chip_date_t2, s.main_force_net_t2, undefined, "", "張", true, "T-2")}
       </div>`;
@@ -974,7 +976,7 @@
     function renderBrokerDiffBlock(s) {
       return `<div class="stock-value">
         <div class="chip-arrow ${trendClass(s.broker_diff_score)}">${isNil(s.broker_diff_score) ? "-" : fmtTrend(s.broker_diff_score)}</div>
-        ${chipLine("", pickFirst(s.broker_diff_t0, s.broker_diff), s.broker_diff_t1, "", "家", false, "")}
+        ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, pickFirst(s.broker_diff_t0, s.broker_diff), s.broker_diff_t1, "", "家", false, "今日")}
         ${chipLine(s.chip_date_t1, s.broker_diff_t1, s.broker_diff_t2, "", "家", true, "T-1")}
         ${chipLine(s.chip_date_t2, s.broker_diff_t2, undefined, "", "家", true, "T-2")}
       </div>`;
