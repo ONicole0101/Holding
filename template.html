@@ -493,6 +493,15 @@
       padding-right: 4px;
     }
 
+
+    .sr-price-cell .table-lv2 {
+      color: #8b949e;
+    }
+
+    .sr-price-cell {
+      cursor: help;
+    }
+
     @media (max-width: 1024px) {
       .container {
         padding: 12px;
@@ -681,6 +690,8 @@
         columns: [
           { key: "code", label: "代碼<br><small>名稱</small>" },
           { key: "price", label: "價格<br><small>60天LH</small>" },
+          { key: "resistance_price", label: "壓力點<br><small>距離%</small>" },
+          { key: "support_price", label: "支撐點<br><small>距離%</small>" },
           { key: "chgPct", label: "漲跌%<br><small>震幅%</small>" },
           { key: "volume", label: "量<br><small>昨/增/張</small>", cls: "col-volume" },
           { key: "chip_concentration_score", label: "籌碼集中%<br><small>3天趨勢</small>" },
@@ -796,6 +807,14 @@
       </div>`;
     }
 
+
+    function supportResistanceTooltip(type) {
+      if (type === "resistance") {
+        return "壓力點距離%＝(壓力點價格 - 目前收盤價) ÷ 目前收盤價 × 100。數值越小代表越接近上方壓力。";
+      }
+      return "支撐點距離%＝(目前收盤價 - 支撐點價格) ÷ 目前收盤價 × 100。數值越小代表越接近下方支撐。";
+    }
+
     function distClass(val) {
       if (isNil(val)) return "";
       if (Number(val) > 0) return "up";
@@ -836,7 +855,7 @@
     function chipLine(dateText, value, previousValue, suffix = "", unit = "", small = false, fallbackLabel = "") {
       const cls = small ? "chip-line-small" : "chip-line";
       const colorCls = previousValue === undefined ? "" : chipValueClass(value, previousValue);
-      const label = chipDateMMDD(dateText, fallbackLabel);
+      const label = small ? chipDateMMDD(dateText, fallbackLabel) : "";
       const displayValue = isNil(value) ? "-" : `${fmt(value, suffix)}${unit}`;
       return `<div class="${cls} ${colorCls}">${label ? `${label}：` : ""}${displayValue}</div>`;
     }
@@ -1062,6 +1081,10 @@
           return renderCodeCell(s);
         case "price":
           return `<td>${renderRangeMetric(s.price, s.price_60d_low, s.price_60d_high)}</td>`;
+        case "resistance_price":
+          return `<td class="sr-price-cell" title="${escapeHtml(supportResistanceTooltip("resistance"))}"><div class="table-lv1 text-red">${fmt(s.resistance_price)}</div><div class="table-lv2">${isNil(s.resistance_distance_pct) ? "-" : `+${fmt(s.resistance_distance_pct, "%")}`}</div></td>`;
+        case "support_price":
+          return `<td class="sr-price-cell" title="${escapeHtml(supportResistanceTooltip("support"))}"><div class="table-lv1 text-green">${fmt(s.support_price)}</div><div class="table-lv2">${isNil(s.support_distance_pct) ? "-" : `-${fmt(s.support_distance_pct, "%")}`}</div></td>`;
         case "chg":
           return `
             <td>
@@ -1168,6 +1191,8 @@
       const technicalGrid = `
         <div class="stock-grid">
           <div class="stock-item"><div class="stock-label">日KD 3天趨勢</div>${renderKDBlock(s)}</div>
+          <div class="stock-item"><div class="stock-label">壓力點 / 距離</div><div class="stock-value"><div class="table-lv1 text-red">${fmt(s.resistance_price)}</div><div class="table-lv2">${isNil(s.resistance_distance_pct) ? "-" : `+${fmt(s.resistance_distance_pct, "%")}`}</div></div></div>
+          <div class="stock-item"><div class="stock-label">支撐點 / 距離</div><div class="stock-value"><div class="table-lv1 text-green">${fmt(s.support_price)}</div><div class="table-lv2">${isNil(s.support_distance_pct) ? "-" : `-${fmt(s.support_distance_pct, "%")}`}</div></div></div>
           <div class="stock-item"><div class="stock-label">日布林% LH</div><div class="stock-value"><div class="table-lv1 ${trendClass(s.bb_score)}">${fmtTrend(s.bb_score)}</div>${renderRangeMetric(s.bb_pct, s.bb_lower, s.bb_upper)}</div></div>
           <div class="stock-item"><div class="stock-label">日Bias6 LH</div><div class="stock-value">${renderRangeMetric(s.bias6, s.bias6_min, s.bias6_max, "%", distClass(s.bias6))}</div></div>
           <div class="stock-item"><div class="stock-label">日Bias18 LH</div><div class="stock-value">${renderRangeMetric(s.bias18, s.bias18_min, s.bias18_max, "%", distClass(s.bias18))}</div></div>
