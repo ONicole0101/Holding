@@ -196,43 +196,6 @@
       line-height: 1.4;
     }
 
-
-    .text-summary-cell {
-      width: clamp(220px, 18vw, 420px);
-      min-width: clamp(220px, 18vw, 420px);
-      max-width: clamp(280px, 24vw, 520px);
-      white-space: normal;
-      line-height: 1.55;
-      color: #c9d1d9;
-      vertical-align: top;
-    }
-
-    .industry-summary-cell {
-      width: clamp(220px, 18vw, 420px);
-      min-width: clamp(220px, 18vw, 420px);
-      max-width: clamp(280px, 23vw, 500px);
-    }
-
-    .news-summary-cell {
-      width: clamp(260px, 24vw, 560px);
-      min-width: clamp(260px, 24vw, 560px);
-      max-width: clamp(320px, 30vw, 680px);
-    }
-
-    .summary-text {
-      display: -webkit-box;
-      -webkit-box-orient: vertical;
-      -webkit-line-clamp: 6;
-      overflow: hidden;
-      word-break: break-word;
-      overflow-wrap: anywhere;
-    }
-
-    .text-summary-cell:hover .summary-text {
-      -webkit-line-clamp: unset;
-      overflow: visible;
-    }
-
     .signal-wrap {
       display: flex;
       flex-direction: column;
@@ -307,6 +270,53 @@
 
     .text-green {
       color: #00b050;
+    }
+
+    .chip-detail {
+      text-align: center;
+      line-height: 1.25;
+      min-width: 92px;
+    }
+
+    .chip-arrow {
+      font-size: clamp(11px, 1vw, 13px);
+      line-height: 1.2;
+      margin-bottom: 2px;
+    }
+
+    .chip-line {
+      line-height: 1.3;
+      font-size: clamp(11px, 1vw, 12px);
+    }
+
+    .chip-line-small {
+      line-height: 1.25;
+      font-size: clamp(9px, 0.85vw, 10px);
+      color: #8b949e;
+    }
+
+    .chip-line.up,
+    .chip-line-small.up {
+      color: #f85149;
+    }
+
+    .chip-line.dn,
+    .chip-line-small.dn {
+      color: #3fb950;
+    }
+
+    .kd-line-small {
+      line-height: 1.25;
+      font-size: clamp(9px, 0.85vw, 10px);
+      color: #8b949e;
+    }
+
+    .kd-line-small.up {
+      color: #f85149;
+    }
+
+    .kd-line-small.dn {
+      color: #3fb950;
     }
 
     .mobile-list {
@@ -483,63 +493,6 @@
       padding-right: 4px;
     }
 
-
-    thead th[data-tooltip]::before {
-      content: "ⓘ";
-      display: inline-block;
-      margin-left: 4px;
-      color: #58a6ff;
-      font-size: 11px;
-      vertical-align: top;
-    }
-
-    thead th[data-tooltip]::after {
-      content: attr(data-tooltip);
-      position: absolute;
-      top: calc(100% + 6px);
-      left: 50%;
-      transform: translateX(-50%);
-      width: min(320px, 70vw);
-      padding: 8px 10px;
-      border: 1px solid #58a6ff66;
-      border-radius: 8px;
-      background: #0d1117;
-      color: #e6edf3;
-      box-shadow: 0 8px 24px #0008;
-      white-space: normal;
-      line-height: 1.45;
-      text-align: left;
-      font-size: 12px;
-      opacity: 0;
-      visibility: hidden;
-      pointer-events: none;
-      z-index: 900;
-    }
-
-    thead th[data-tooltip]:hover::after,
-    thead th[data-tooltip]:focus::after {
-      opacity: 1;
-      visibility: visible;
-    }
-
-    .sr-price-cell .table-lv2 {
-      color: #8b949e;
-    }
-
-    .sr-price-cell {
-      cursor: help;
-    }
-
-    .disposition-period {
-      margin-top: 2px;
-      line-height: 1.3;
-      white-space: normal;
-    }
-
-    .disposition-period div {
-      white-space: nowrap;
-    }
-
     @media (max-width: 1024px) {
       .container {
         padding: 12px;
@@ -566,18 +519,6 @@
       .tab-note {
         width: 100%;
         margin-left: 0;
-      }
-
-      .text-summary-cell {
-        width: clamp(200px, 32vw, 380px);
-        min-width: clamp(200px, 32vw, 380px);
-        max-width: clamp(240px, 42vw, 460px);
-      }
-
-      .news-summary-cell {
-        width: clamp(240px, 42vw, 520px);
-        min-width: clamp(240px, 42vw, 520px);
-        max-width: clamp(280px, 52vw, 600px);
       }
     }
 
@@ -614,21 +555,6 @@
 
       .mobile-list {
         display: block;
-      }
-
-      .stock-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .stock-item.summary-mobile-item {
-        grid-column: 1 / -1;
-      }
-
-      .stock-item.summary-mobile-item .stock-value {
-        line-height: 1.55;
-        white-space: normal;
-        word-break: break-word;
-        overflow-wrap: anywhere;
       }
     }
   </style>
@@ -742,7 +668,7 @@
           { key: "code", label: "代碼<br><small>名稱</small>" },
           { key: "price", label: "價格<br><small>60天LH</small>" },
           { key: "chg", label: "漲跌<br><small>LH</small>" },
-          { key: "chgPct", label: "漲跌%<br><small>震幅%LH</small>" },
+          { key: "chgPct", label: "漲跌%<br><small>震幅%</small>" },
           { key: "volume", label: "量<br><small>昨/增/張</small>", cls: "col-volume" },
           { key: "eps_Y", label: "EPS<br><small>TTM</small>", cls: "col-lg" },
           { key: "k", label: "日KD<br><small>3天趨勢</small>" },
@@ -751,17 +677,15 @@
         ]
       },
       technical: {
-        note: "技術面：壓力/支撐、籌碼、KD、布林、Bias、PER/PBR 60天區間",
+        note: "技術面：價格、KD、布林、Bias、PER/PBR 60天區間",
         columns: [
           { key: "code", label: "代碼<br><small>名稱</small>" },
           { key: "price", label: "價格<br><small>60天LH</small>" },
-          { key: "resistance_price", label: "壓力點<br><small>距離%</small>", tooltip: "壓力點距離%＝(壓力點價格 - 目前收盤價) ÷ 目前收盤價 × 100。數值越小代表越接近上方壓力，突破後可能轉為支撐。" },
-          { key: "support_price", label: "支撐點<br><small>距離%</small>", tooltip: "支撐點距離%＝(目前收盤價 - 支撐點價格) ÷ 目前收盤價 × 100。數值越小代表越接近下方支撐，跌破後可能轉為壓力。" },
-          { key: "chgPct", label: "漲跌%<br><small>震幅%LH</small>" },
+          { key: "chgPct", label: "漲跌%<br><small>震幅%</small>" },
           { key: "volume", label: "量<br><small>昨/增/張</small>", cls: "col-volume" },
-          { key: "chip_concentration_score", label: "籌碼集中%<br><small>3天趨勢</small>", tooltip: "籌碼集中%＝主力分點淨買賣力道的絕對值 ÷ 全市場買賣量合計 × 100。數值越高代表籌碼越集中；需搭配主力買賣超正負方向判斷。" },
-          { key: "main_force_score", label: "主力買賣超<br><small>3天趨勢</small>", tooltip: "主力買賣超＝前15大買超分點淨買超 + 前15大賣超分點淨賣超。正值偏主力買進，負值偏主力賣出。" },
-          { key: "broker_diff", label: "買賣家數差<br><small>趨勢</small>", tooltip: "買賣家數差＝有買進的券商分點家數 - 有賣出的券商分點家數。正值代表參與買方家數較多，負值代表買方較集中或賣方家數較多。" },
+          { key: "chip_concentration_score", label: "籌碼集中%<br><small>3天趨勢</small>" },
+          { key: "main_force_score", label: "主力買賣超<br><small>3天趨勢</small>" },
+          { key: "broker_diff", label: "買賣家數差<br><small>趨勢</small>" },
           { key: "k", label: "日KD<br><small>3天趨勢</small>" },
           { key: "bb_pct", label: "日布林%<br><small>LH</small>" },
           { key: "bias6", label: "日Bias6<br><small>LH</small>" },
@@ -785,8 +709,8 @@
           { key: "yield_value", label: "殖利率<br><small>估65%</small>", cls: "col-md" },
           { key: "per_latest", label: "日PER<br><small>60天LH</small>" },
           { key: "pbr_latest", label: "日PBR<br><small>60天LH</small>" },
-          { key: "industry_summary", label: "產業", cls: "industry-summary-col" },
-          { key: "news_summary", label: "新聞", cls: "news-summary-col" }
+          { key: "industry_summary", label: "產業" },
+          { key: "news_summary", label: "新聞" }
         ]
       },
       signal: {
@@ -794,7 +718,7 @@
         columns: [
           { key: "code", label: "代碼<br><small>名稱</small>" },
           { key: "price", label: "價格<br><small>60天LH</small>" },
-          { key: "chgPct", label: "漲跌%<br><small>震幅%LH</small>" },
+          { key: "chgPct", label: "漲跌%<br><small>震幅%</small>" },
           { key: "volume", label: "量<br><small>昨/增/張</small>", cls: "col-volume" },
           { key: "chip_concentration_score", label: "籌碼集中%<br><small>3天趨勢</small>" },
           { key: "main_force_score", label: "主力買賣超<br><small>3天趨勢</small>" },
@@ -872,21 +796,6 @@
       </div>`;
     }
 
-    function supportResistanceTooltip(type) {
-      if (type === "resistance") {
-        return "壓力點距離%＝(壓力點價格 - 目前收盤價) ÷ 目前收盤價 × 100。數值越小代表越接近上方壓力。";
-      }
-      return "支撐點距離%＝(目前收盤價 - 支撐點價格) ÷ 目前收盤價 × 100。數值越小代表越接近下方支撐。";
-    }
-
-    function renderChangePctBlock(s) {
-      return `
-        <div class="table-lv1 ${chgClass(s)}">${chgSign(s)}${fmt(s.chgPct, "%")}</div>
-        <div class="table-lv2">震幅 ${fmt(s.amp, "%")}</div>
-        <div class="table-lv2">${fmt(s.price_min)}</div>
-        <div class="table-lv2">${fmt(s.price_max)}</div>`;
-    }
-
     function distClass(val) {
       if (isNil(val)) return "";
       if (Number(val) > 0) return "up";
@@ -932,12 +841,69 @@
       return `<div class="${cls} ${colorCls}">${label ? `${label}：` : ""}${displayValue}</div>`;
     }
 
+    function kdValueClass(current, previous) {
+      return chipValueClass(current, previous);
+    }
+
+    function kdDateMMDD(s, idx) {
+      const value = pickFirst(
+        s[`kd_date_t${idx}`],
+        s[`k_date_t${idx}`],
+        s[`date_t${idx}`],
+        s[`price_date_t${idx}`],
+        s[`chip_date_t${idx}`]
+      );
+      return chipDateMMDD(value, idx === 1 ? "T-1" : idx === 2 ? "T-2" : "");
+    }
+
+    function kdValue(s, idx) {
+      if (idx === 0) return pickFirst(s.k_t0, s.kd_k_t0, s.k);
+      if (idx === 1) return pickFirst(s.k_t1, s.kd_k_t1, s.prev_k, s.k_prev, s.k_t_1);
+      if (idx === 2) return pickFirst(s.k_t2, s.kd_k_t2, s.prev2_k, s.k_prev2, s.k_t_2);
+      return null;
+    }
+
+    function kdLine(s, idx, value, previousValue) {
+      if (isNil(value)) return "";
+      const label = kdDateMMDD(s, idx);
+      const colorCls = previousValue === undefined ? "" : kdValueClass(value, previousValue);
+      return `<div class="kd-line-small ${colorCls}">${label ? `${label}：` : ""}K ${fmt(value)}</div>`;
+    }
+
+    function renderKDCell(s) {
+      const k0 = kdValue(s, 0);
+      const k1 = kdValue(s, 1);
+      const k2 = kdValue(s, 2);
+      const k0Class = isNil(k1) ? "" : kdValueClass(k0, k1);
+      return `
+            <td>
+              <div class="table-lv1 ${trendClass(s.kd_score)}">${fmtTrend(s.kd_score)}</div>
+              <div class="table-lv2 ${k0Class}">K ${fmt(k0)}</div>
+              <div class="table-lv2">D ${fmt(s.d)}</div>
+              ${kdLine(s, 1, k1, k2)}
+              ${kdLine(s, 2, k2, undefined)}
+            </td>`;
+    }
+
+    function renderKDBlock(s) {
+      const k0 = kdValue(s, 0);
+      const k1 = kdValue(s, 1);
+      const k2 = kdValue(s, 2);
+      const k0Class = isNil(k1) ? "" : kdValueClass(k0, k1);
+      return `<div class="stock-value">
+        <div class="table-lv1 ${trendClass(s.kd_score)}">${fmtTrend(s.kd_score)}</div>
+        <div class="table-lv2 ${k0Class}">K ${fmt(k0)} / D ${fmt(s.d)}</div>
+        ${kdLine(s, 1, k1, k2)}
+        ${kdLine(s, 2, k2, undefined)}
+      </div>`;
+    }
+
     function renderChipConcentrationCell(s) {
       return `
         <td>
           <div class="chip-detail">
             <div class="chip-arrow ${trendClass(s.chip_concentration_score)}">${isNil(s.chip_concentration_score) ? "-" : fmtTrend(s.chip_concentration_score)}</div>
-            ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, pickFirst(s.chip_concentration_pct_t0, s.chip_concentration_pct), s.chip_concentration_pct_t1, "%", "", false, "今日")}
+            ${chipLine("", pickFirst(s.chip_concentration_pct_t0, s.chip_concentration_pct), s.chip_concentration_pct_t1, "%", "", false, "")}
             ${chipLine(s.chip_date_t1, s.chip_concentration_pct_t1, s.chip_concentration_pct_t2, "%", "", true, "T-1")}
             ${chipLine(s.chip_date_t2, s.chip_concentration_pct_t2, undefined, "%", "", true, "T-2")}
           </div>
@@ -949,7 +915,7 @@
         <td>
           <div class="chip-detail">
             <div class="chip-arrow ${trendClass(s.main_force_score)}">${isNil(s.main_force_score) ? "-" : fmtTrend(s.main_force_score)}</div>
-            ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, pickFirst(s.main_force_net_t0, s.main_force_net), s.main_force_net_t1, "", "張", false, "今日")}
+            ${chipLine("", pickFirst(s.main_force_net_t0, s.main_force_net), s.main_force_net_t1, "", "張", false, "")}
             ${chipLine(s.chip_date_t1, s.main_force_net_t1, s.main_force_net_t2, "", "張", true, "T-1")}
             ${chipLine(s.chip_date_t2, s.main_force_net_t2, undefined, "", "張", true, "T-2")}
           </div>
@@ -961,7 +927,7 @@
         <td>
           <div class="chip-detail">
             <div class="chip-arrow ${trendClass(s.broker_diff_score)}">${isNil(s.broker_diff_score) ? "-" : fmtTrend(s.broker_diff_score)}</div>
-            ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, pickFirst(s.broker_diff_t0, s.broker_diff), s.broker_diff_t1, "", "家", false, "今日")}
+            ${chipLine("", pickFirst(s.broker_diff_t0, s.broker_diff), s.broker_diff_t1, "", "家", false, "")}
             ${chipLine(s.chip_date_t1, s.broker_diff_t1, s.broker_diff_t2, "", "家", true, "T-1")}
             ${chipLine(s.chip_date_t2, s.broker_diff_t2, undefined, "", "家", true, "T-2")}
           </div>
@@ -971,7 +937,7 @@
     function renderChipConcentrationBlock(s) {
       return `<div class="stock-value">
         <div class="chip-arrow ${trendClass(s.chip_concentration_score)}">${isNil(s.chip_concentration_score) ? "-" : fmtTrend(s.chip_concentration_score)}</div>
-        ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, pickFirst(s.chip_concentration_pct_t0, s.chip_concentration_pct), s.chip_concentration_pct_t1, "%", "", false, "今日")}
+        ${chipLine("", pickFirst(s.chip_concentration_pct_t0, s.chip_concentration_pct), s.chip_concentration_pct_t1, "%", "", false, "")}
         ${chipLine(s.chip_date_t1, s.chip_concentration_pct_t1, s.chip_concentration_pct_t2, "%", "", true, "T-1")}
         ${chipLine(s.chip_date_t2, s.chip_concentration_pct_t2, undefined, "%", "", true, "T-2")}
       </div>`;
@@ -980,7 +946,7 @@
     function renderMainForceBlock(s) {
       return `<div class="stock-value">
         <div class="chip-arrow ${trendClass(s.main_force_score)}">${isNil(s.main_force_score) ? "-" : fmtTrend(s.main_force_score)}</div>
-        ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, pickFirst(s.main_force_net_t0, s.main_force_net), s.main_force_net_t1, "", "張", false, "今日")}
+        ${chipLine("", pickFirst(s.main_force_net_t0, s.main_force_net), s.main_force_net_t1, "", "張", false, "")}
         ${chipLine(s.chip_date_t1, s.main_force_net_t1, s.main_force_net_t2, "", "張", true, "T-1")}
         ${chipLine(s.chip_date_t2, s.main_force_net_t2, undefined, "", "張", true, "T-2")}
       </div>`;
@@ -989,17 +955,17 @@
     function renderBrokerDiffBlock(s) {
       return `<div class="stock-value">
         <div class="chip-arrow ${trendClass(s.broker_diff_score)}">${isNil(s.broker_diff_score) ? "-" : fmtTrend(s.broker_diff_score)}</div>
-        ${chipLine(s.chip_date_t0 ?? s.chip_latest_date, pickFirst(s.broker_diff_t0, s.broker_diff), s.broker_diff_t1, "", "家", false, "今日")}
+        ${chipLine("", pickFirst(s.broker_diff_t0, s.broker_diff), s.broker_diff_t1, "", "家", false, "")}
         ${chipLine(s.chip_date_t1, s.broker_diff_t1, s.broker_diff_t2, "", "家", true, "T-1")}
         ${chipLine(s.chip_date_t2, s.broker_diff_t2, undefined, "", "家", true, "T-2")}
       </div>`;
     }
 
-    function dispositionPeriodHtml(s) {
+    function dispositionPeriodText(s) {
       const start = fmtMonthDay(s.period_start ?? s.disposition_period_start);
       const end = fmtMonthDay(s.period_end ?? s.disposition_period_end);
       if (!start || !end) return "";
-      return `<div> ${escapeHtml(start)}</div><div>${escapeHtml(end)}</div>`;
+      return `${start}-${end}`;
     }
 
     function shortName(name) {
@@ -1016,12 +982,12 @@
     }
 
     function renderCodeCell(s) {
-      const dispositionHtml = dispositionPeriodHtml(s);
+      const dispositionText = dispositionPeriodText(s);
       return `
         <td>
           <div class="table-lv1">${s.code ?? ""}</div>
           <div class="table-lv2">${shortName(s.name)}</div>
-          ${dispositionHtml ? `<div class="table-lv3 text-red disposition-period">${dispositionHtml}</div>` : ""}
+          ${dispositionText ? `<div class="table-lv3 text-red">${dispositionText}</div>` : ""}
         </td>`;
     }
 
@@ -1096,10 +1062,6 @@
           return renderCodeCell(s);
         case "price":
           return `<td>${renderRangeMetric(s.price, s.price_60d_low, s.price_60d_high)}</td>`;
-        case "resistance_price":
-          return `<td class="sr-price-cell" title="${escapeHtml(supportResistanceTooltip("resistance"))}"><div class="table-lv1 text-red">${fmt(s.resistance_price)}</div><div class="table-lv2">${isNil(s.resistance_distance_pct) ? "-" : `+${fmt(s.resistance_distance_pct, "%")}`}</div></td>`;
-        case "support_price":
-          return `<td class="sr-price-cell" title="${escapeHtml(supportResistanceTooltip("support"))}"><div class="table-lv1 text-green">${fmt(s.support_price)}</div><div class="table-lv2">${isNil(s.support_distance_pct) ? "-" : `-${fmt(s.support_distance_pct, "%")}`}</div></td>`;
         case "chg":
           return `
             <td>
@@ -1111,7 +1073,8 @@
         case "chgPct":
           return `
             <td>
-              ${renderChangePctBlock(s)}
+              <div class="table-lv1 ${chgClass(s)}">${chgSign(s)}${fmt(s.chgPct, "%")}</div>
+              <div class="table-lv2">${fmt(s.amp, "%")}</div>
             </td>`;
         case "volume":
           return `
@@ -1148,12 +1111,7 @@
         case "pbr_latest":
           return `<td>${renderRangeMetric(s.pbr_latest, s.pbr_60d_low, s.pbr_60d_high)}</td>`;
         case "k":
-          return `
-            <td>
-              <div class="table-lv1 ${trendClass(s.kd_score)}">${fmtTrend(s.kd_score)}</div>
-              <div class="table-lv2">K ${fmt(s.k)}</div>
-              <div class="table-lv2">D ${fmt(s.d)}</div>
-            </td>`;
+          return renderKDCell(s);
         case "bb_pct":
           return `
             <td>
@@ -1168,9 +1126,9 @@
           return `<td>${renderRangeMetric(s.bias50, s.bias50_min, s.bias50_max, "%", distClass(s.bias50))}</td>`;
 
         case "industry_summary":
-          return `<td class="text-summary-cell industry-summary-cell"><div class="summary-text">${escapeHtml(s.industry_summary || "-")}</div></td>`;
+          return `<td class="text-summary-cell">${escapeHtml(s.industry_summary || "-")}</td>`;
         case "news_summary":
-          return `<td class="text-summary-cell news-summary-cell"><div class="summary-text">${escapeHtml(s.news_summary || "-")}</div></td>`;
+          return `<td class="text-summary-cell">${escapeHtml(s.news_summary || "-")}</td>`;
         case "sig":
           return renderSignalCell(s);
         default:
@@ -1182,7 +1140,7 @@
       const columns = TAB_CONFIG[currentTab].columns;
       document.getElementById("stockHead").innerHTML = `
         <tr>
-          ${columns.map(col => `<th class="${col.cls ?? ""}" data-key="${col.key}"${col.tooltip ? ` data-tooltip="${escapeHtml(col.tooltip)}" tabindex="0"` : ""}>${col.label}</th>`).join("")}
+          ${columns.map(col => `<th class="${col.cls ?? ""}" data-key="${col.key}">${col.label}</th>`).join("")}
         </tr>`;
       bindSorting();
       updateSortIndicators();
@@ -1194,14 +1152,14 @@
     }
 
     function renderMobileCard(s) {
-      const dispositionHtml = dispositionPeriodHtml(s);
+      const dispositionText = dispositionPeriodText(s);
       const tab = currentTab;
 
       const commonHead = `
         <div class="stock-head">
           <div>
             <div class="table-lv1"><b>${shortName(s.name)} (${s.code ?? ""})</b></div>
-            ${dispositionHtml ? `<div class="table-lv3 text-red disposition-period">${dispositionHtml}</div>` : ""}
+            ${dispositionText ? `<div class="table-lv3 text-red">${dispositionText}</div>` : ""}
             <div class="table-lv2 ${chgClass(s)}">${chgSign(s)}${fmt(s.chg)} / ${chgSign(s)}${fmt(s.chgPct, "%")}</div>
           </div>
           <div class="stock-value">${renderRangeMetric(s.price, s.price_60d_low, s.price_60d_high)}</div>
@@ -1209,15 +1167,12 @@
 
       const technicalGrid = `
         <div class="stock-grid">
-          <div class="stock-item"><div class="stock-label">漲跌% / 震幅% LH</div><div class="stock-value">${renderChangePctBlock(s)}</div></div>
-          <div class="stock-item"><div class="stock-label">日KD 3天趨勢</div><div class="stock-value"><div class="table-lv1 ${trendClass(s.kd_score)}">${fmtTrend(s.kd_score)}</div><div class="table-lv2">K ${fmt(s.k)} / D ${fmt(s.d)}</div></div></div>
+          <div class="stock-item"><div class="stock-label">日KD 3天趨勢</div>${renderKDBlock(s)}</div>
           <div class="stock-item"><div class="stock-label">日布林% LH</div><div class="stock-value"><div class="table-lv1 ${trendClass(s.bb_score)}">${fmtTrend(s.bb_score)}</div>${renderRangeMetric(s.bb_pct, s.bb_lower, s.bb_upper)}</div></div>
           <div class="stock-item"><div class="stock-label">日Bias6 LH</div><div class="stock-value">${renderRangeMetric(s.bias6, s.bias6_min, s.bias6_max, "%", distClass(s.bias6))}</div></div>
           <div class="stock-item"><div class="stock-label">日Bias18 LH</div><div class="stock-value">${renderRangeMetric(s.bias18, s.bias18_min, s.bias18_max, "%", distClass(s.bias18))}</div></div>
           <div class="stock-item"><div class="stock-label">日Bias50 LH</div><div class="stock-value">${renderRangeMetric(s.bias50, s.bias50_min, s.bias50_max, "%", distClass(s.bias50))}</div></div>
           <div class="stock-item"><div class="stock-label">量 / 昨 / 增 / 張</div><div class="stock-value"><div>${fmt(s.volume)} 張</div><div class="table-lv2">昨 ${fmt(s.prev_volume)}</div><div class="table-lv2 ${trendClass(s.volume_ratio)}">${isNil(s.volume_ratio) ? "-" : `${fmtTrend(s.volume_ratio)} ${fmt(s.volume_ratio, "%")}`}</div><div class="table-lv2">${isNil(s.volume_add) ? "-" : `${fmt(s.volume_add)} 張`}</div></div></div>
-          <div class="stock-item"><div class="stock-label">壓力點 / 距離</div><div class="stock-value"><div class="table-lv1 text-red">${fmt(s.resistance_price)}</div><div class="table-lv2">${isNil(s.resistance_distance_pct) ? "-" : `+${fmt(s.resistance_distance_pct, "%")}`}</div></div></div>
-          <div class="stock-item"><div class="stock-label">支撐點 / 距離</div><div class="stock-value"><div class="table-lv1 text-green">${fmt(s.support_price)}</div><div class="table-lv2">${isNil(s.support_distance_pct) ? "-" : `-${fmt(s.support_distance_pct, "%")}`}</div></div></div>
           <div class="stock-item"><div class="stock-label">籌碼集中% 3天趨勢</div>${renderChipConcentrationBlock(s)}</div>
           <div class="stock-item"><div class="stock-label">主力買賣超 3天趨勢</div>${renderMainForceBlock(s)}</div>
           <div class="stock-item"><div class="stock-label">買賣家數差 趨勢</div>${renderBrokerDiffBlock(s)}</div>
@@ -1225,7 +1180,6 @@
 
       const fundamentalGrid = `
         <div class="stock-grid">
-          <div class="stock-item"><div class="stock-label">漲跌% / 震幅% LH</div><div class="stock-value">${renderChangePctBlock(s)}</div></div>
           <div class="stock-item"><div class="stock-label">EPS / TTM</div><div class="stock-value"><div class="table-lv1">${fmt(s.eps_Y)}</div><div class="table-lv2">${fmt(s.eps_ttm)}</div></div></div>
           <div class="stock-item"><div class="stock-label">營收</div><div class="stock-value">${renderMetric3(s.rev, s.rev_mom, s.rev_qoq, s.rev_yoy)}</div></div>
           <div class="stock-item"><div class="stock-label">毛利率</div><div class="stock-value">${renderMetric3(s.gross_margin, null, s.gross_margin_qoq, s.gross_margin_yoy_diff)}</div></div>
@@ -1234,14 +1188,14 @@
           <div class="stock-item"><div class="stock-label">殖利率 估65%</div><div class="stock-value">${fmt(Number(s.yield_value ?? 0) * 0.65, "%")}</div></div>
           <div class="stock-item"><div class="stock-label">日PER 60天LH</div><div class="stock-value">${renderRangeMetric(s.per_latest, s.per_60d_low, s.per_60d_high)}</div></div>
           <div class="stock-item"><div class="stock-label">日PBR 60天LH</div><div class="stock-value">${renderRangeMetric(s.pbr_latest, s.pbr_60d_low, s.pbr_60d_high)}</div></div>
-          <div class="stock-item summary-mobile-item"><div class="stock-label">產業</div><div class="stock-value">${escapeHtml(s.industry_summary || "-")}</div></div>
-          <div class="stock-item summary-mobile-item"><div class="stock-label">新聞</div><div class="stock-value">${escapeHtml(s.news_summary || "-")}</div></div>
+          <div class="stock-item"><div class="stock-label">產業</div><div class="stock-value">${escapeHtml(s.industry_summary || "-")}</div></div>
+          <div class="stock-item"><div class="stock-label">新聞</div><div class="stock-value">${escapeHtml(s.news_summary || "-")}</div></div>
         </div>`;
 
       const overviewGrid = `
         <div class="stock-grid">
           <div class="stock-item"><div class="stock-label">EPS / TTM</div><div class="stock-value"><div class="table-lv1">${fmt(s.eps_Y)}</div><div class="table-lv2">${fmt(s.eps_ttm)}</div></div></div>
-          <div class="stock-item"><div class="stock-label">日KD</div><div class="stock-value"><div class="table-lv1 ${trendClass(s.kd_score)}">${fmtTrend(s.kd_score)}</div><div class="table-lv2">K ${fmt(s.k)} / D ${fmt(s.d)}</div></div></div>
+          <div class="stock-item"><div class="stock-label">日KD</div>${renderKDBlock(s)}</div>
           <div class="stock-item"><div class="stock-label">日布林% LH</div><div class="stock-value"><div class="table-lv1 ${trendClass(s.bb_score)}">${fmtTrend(s.bb_score)}</div>${renderRangeMetric(s.bb_pct, s.bb_lower, s.bb_upper)}</div></div>
           <div class="stock-item"><div class="stock-label">量 / 昨 / 增 / 張</div><div class="stock-value"><div>${fmt(s.volume)} 張</div><div class="table-lv2">昨 ${fmt(s.prev_volume)}</div><div class="table-lv2 ${trendClass(s.volume_ratio)}">${isNil(s.volume_ratio) ? "-" : `${fmtTrend(s.volume_ratio)} ${fmt(s.volume_ratio, "%")}`}</div><div class="table-lv2">${isNil(s.volume_add) ? "-" : `${fmt(s.volume_add)} 張`}</div></div></div>
         </div>`;
@@ -1460,4 +1414,6 @@
 
 
 
-</body></html>
+</body>
+
+</html>
