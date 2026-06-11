@@ -980,15 +980,28 @@
       return `<div class="table-lv2 ${colorCls}">${label ? `${label}：` : ""}K ${fmt(value)}</div>`;
     }
 
+    function kdDayScore(s) {
+      const k0 = kdValue(s, 0);
+      const k1 = kdValue(s, 1);
+      if (isNil(k0) || isNil(k1)) return 0;
+      const cur = Number(k0);
+      const prev = Number(k1);
+      if (!Number.isFinite(cur) || !Number.isFinite(prev)) return 0;
+      if (cur > prev) return 0.5;
+      if (cur < prev) return -0.5;
+      return 0;
+    }
+
     function renderKDCell(s) {
       const k0 = kdValue(s, 0);
       const k1 = kdValue(s, 1);
       const k2 = kdValue(s, 2);
       const k3 = kdValue(s, 3);
+      const score = kdDayScore(s);
       const k0Class = isNil(k1) ? "" : chipValueClass(k0, k1);
       return `
         <td>
-          <div class="table-lv1 ${trendClass(s.kd_score)}">${fmtTrend(s.kd_score)}</div>
+          <div class="table-lv1 ${trendClass(score)}">${fmtTrend(score)}</div>
           <div class="table-lv2 ${k0Class}">K ${fmt(k0)}</div>
           <div class="table-lv2">D ${fmt(s.d)}</div>
           ${kdLine(s, 1, k1, k2)}
@@ -1001,9 +1014,10 @@
       const k1 = kdValue(s, 1);
       const k2 = kdValue(s, 2);
       const k3 = kdValue(s, 3);
+      const score = kdDayScore(s);
       const k0Class = isNil(k1) ? "" : chipValueClass(k0, k1);
       return `<div class="stock-value">
-        <div class="table-lv1 ${trendClass(s.kd_score)}">${fmtTrend(s.kd_score)}</div>
+        <div class="table-lv1 ${trendClass(score)}">${fmtTrend(score)}</div>
         <div class="table-lv2 ${k0Class}">K ${fmt(k0)} / D ${fmt(s.d)}</div>
         ${kdLine(s, 1, k1, k2)}
         ${kdLine(s, 2, k2, k3)}
@@ -1033,9 +1047,15 @@
       const high0 = priceLHValue(s, 0, "high");
       const low1 = priceLHValue(s, 1, "low");
       const high1 = priceLHValue(s, 1, "high");
-      if ([low0, high0, low1, high1].some(isNil)) return null;
-      if (Number(low0) > Number(low1) && Number(high0) > Number(high1)) return 1;
-      if (Number(low0) < Number(low1) && Number(high0) < Number(high1)) return -1;
+      const low2 = priceLHValue(s, 2, "low");
+      const high2 = priceLHValue(s, 2, "high");
+      if ([low0, high0, low1, high1, low2, high2].some(isNil)) return null;
+      const higherHighs = Number(high0) > Number(high1) && Number(high1) > Number(high2);
+      const higherLows = Number(low0) > Number(low1) && Number(low1) > Number(low2);
+      const lowerHighs = Number(high0) < Number(high1) && Number(high1) < Number(high2);
+      const lowerLows = Number(low0) < Number(low1) && Number(low1) < Number(low2);
+      if (higherHighs && higherLows) return 1;
+      if (lowerHighs && lowerLows) return -1;
       return 0;
     }
 
@@ -1043,7 +1063,7 @@
       if (isNil(score)) return "-";
       if (score > 0) return "高高";
       if (score < 0) return "低低";
-      return "混合";
+      return "盤整";
     }
 
     function renderPriceLHLine(s, idx, previousIdx) {
@@ -1300,14 +1320,16 @@
           return `<td>${renderRangeMetric(s.per_latest, s.per_60d_low, s.per_60d_high)}</td>`;
         case "pbr_latest":
           return `<td>${renderRangeMetric(s.pbr_latest, s.pbr_60d_low, s.pbr_60d_high)}</td>`;
-        case "k":
+        case "k": {
           if (currentTab === "technical") return renderKDCell(s);
+          const score = kdDayScore(s);
           return `
             <td>
-              <div class="table-lv1 ${trendClass(s.kd_score)}">${fmtTrend(s.kd_score)}</div>
+              <div class="table-lv1 ${trendClass(score)}">${fmtTrend(score)}</div>
               <div class="table-lv2">K ${fmt(s.k)}</div>
               <div class="table-lv2">D ${fmt(s.d)}</div>
             </td>`;
+        }
         case "bb_pct":
           return `
             <td>
@@ -1396,7 +1418,7 @@
       const overviewGrid = `
         <div class="stock-grid">
           <div class="stock-item"><div class="stock-label">EPS / TTM</div><div class="stock-value"><div class="table-lv1">${fmt(s.eps_Y)}</div><div class="table-lv2">${fmt(s.eps_ttm)}</div></div></div>
-          <div class="stock-item"><div class="stock-label">日KD</div><div class="stock-value"><div class="table-lv1 ${trendClass(s.kd_score)}">${fmtTrend(s.kd_score)}</div><div class="table-lv2">K ${fmt(s.k)} / D ${fmt(s.d)}</div></div></div>
+          <div class="stock-item"><div class="stock-label">日KD</div><div class="stock-value"><div class="table-lv1 ${trendClass(kdDayScore(s))}">${fmtTrend(kdDayScore(s))}</div><div class="table-lv2">K ${fmt(s.k)} / D ${fmt(s.d)}</div></div></div>
           <div class="stock-item"><div class="stock-label">日布林% LH</div><div class="stock-value"><div class="table-lv1 ${trendClass(s.bb_score)}">${fmtTrend(s.bb_score)}</div>${renderRangeMetric(s.bb_pct, s.bb_lower, s.bb_upper)}</div></div>
           <div class="stock-item"><div class="stock-label">量 / 昨 / 增 / 張</div><div class="stock-value"><div>${fmt(s.volume)} 張</div><div class="table-lv2">昨 ${fmt(s.prev_volume)}</div><div class="table-lv2 ${trendClass(s.volume_ratio)}">${isNil(s.volume_ratio) ? "-" : `${fmtTrend(s.volume_ratio)} ${fmt(s.volume_ratio, "%")}`}</div><div class="table-lv2">${isNil(s.volume_add) ? "-" : `${fmt(s.volume_add)} 張`}</div></div></div>
         </div>`;

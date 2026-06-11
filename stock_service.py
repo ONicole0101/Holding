@@ -353,19 +353,8 @@ def process_stock(s, static_map=None, chips_map=None, news_map=None):
         prev2_k = float(prev2["K"]) if pd.notna(prev2["K"]) else None
         prev2_d = float(prev2["D"]) if pd.notna(prev2["D"]) else None
 
-        kd_score = 0
-        if None not in (k, d, prev_k, prev_d):
-            if k > d and prev_k <= prev_d:
-                kd_score = 1
-            elif k < d and prev_k >= prev_d:
-                kd_score = -1
-            elif k > d:
-                kd_score = 0.5
-            elif k < d:
-                kd_score = -0.5
-
         kd_trend = get_kd_trend(
-            df) or {"kd_3d_up": None, "kd_trend": None, "kd_score": None}
+            df) or {"kd_3d_up": None, "kd_trend": None}
         bb_trend = get_bb_trend(
             df) or {"bb_3d_up": None, "bb_trend": None, "bb_score": None}
         k_trend = kd_trend.get("kd_trend")
@@ -554,7 +543,6 @@ def process_stock(s, static_map=None, chips_map=None, news_map=None):
             "kd_trend": kd_trend.get("kd_trend"),
             "k_trend": k_trend,
             "d_trend": d_trend,
-            "kd_score": float(kd_score),
             "ma18": float(round(ma18, 2)) if ma18 is not None else None,
             "ma18_break": bool(ma18_break),
             "kd_buy": bool(kd_buy),
