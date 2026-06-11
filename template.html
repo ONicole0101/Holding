@@ -167,6 +167,19 @@
       color: #3fb950;
     }
 
+    .price-lh-line {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      line-height: 1.35;
+      color: #8b949e;
+    }
+
+    .price-lh-date {
+      min-width: 34px;
+      text-align: right;
+    }
+
     .sig {
       display: inline-block;
       padding: 2px 6px;
@@ -755,6 +768,7 @@
         columns: [
           { key: "code", label: "代碼<br><small>名稱</small>" },
           { key: "price", label: "價格<br><small>60天LH</small>" },
+          { key: "price_lh_trend", label: "價格LH<br><small>3天趨勢</small>", cls: "col-md" },
           { key: "resistance_price", label: "壓力點<br><small>距離%</small>", tooltip: "壓力點距離%＝(壓力點價格 - 目前收盤價) ÷ 目前收盤價 × 100。數值越小代表越接近上方壓力，突破後可能轉為支撐。" },
           { key: "support_price", label: "支撐點<br><small>距離%</small>", tooltip: "支撐點距離%＝(目前收盤價 - 支撐點價格) ÷ 目前收盤價 × 100。數值越小代表越接近下方支撐，跌破後可能轉為壓力。" },
           { key: "chgPct", label: "漲跌%<br><small>震幅%LH</small>" },
@@ -932,6 +946,163 @@
       return `<div class="${cls} ${colorCls}">${label ? `${label}：` : ""}${displayValue}</div>`;
     }
 
+    function dayLabel(idx) {
+      if (idx === 0) return "T";
+      if (idx === 1) return "T-1";
+      if (idx === 2) return "T-2";
+      return "";
+    }
+
+    function dayDateMMDD(s, idx, prefix = "date") {
+      const value = pickFirst(
+        s[`${prefix}_date_t${idx}`],
+        s[`date_t${idx}`],
+        s[`price_date_t${idx}`],
+        s[`kd_date_t${idx}`],
+        s[`chip_date_t${idx}`],
+        s[`date${idx}`]
+      );
+      return chipDateMMDD(value, dayLabel(idx));
+    }
+
+    function kdValue(s, idx) {
+      if (idx === 0) return pickFirst(s.k_t0, s.kd_k_t0, s.k);
+      if (idx === 1) return pickFirst(s.k_t1, s.kd_k_t1, s.prev_k, s.k_prev, s.k_t_1, s.K_t1, s.k1);
+      if (idx === 2) return pickFirst(s.k_t2, s.kd_k_t2, s.prev2_k, s.k_prev2, s.k_t_2, s.K_t2, s.k2);
+      if (idx === 3) return pickFirst(s.k_t3, s.kd_k_t3, s.prev3_k, s.k_prev3, s.k_t_3, s.K_t3, s.k3);
+      return null;
+    }
+
+    function kdLine(s, idx, value, previousValue) {
+      if (isNil(value)) return "";
+      const label = dayDateMMDD(s, idx, "kd");
+      const colorCls = previousValue === undefined ? "" : chipValueClass(value, previousValue);
+      return `<div class="table-lv2 ${colorCls}">${label ? `${label}：` : ""}K ${fmt(value)}</div>`;
+    }
+
+    function kdDayScore(s) {
+      const k0 = kdValue(s, 0);
+      const k1 = kdValue(s, 1);
+      if (isNil(k0) || isNil(k1)) return 0;
+      const cur = Number(k0);
+      const prev = Number(k1);
+      if (!Number.isFinite(cur) || !Number.isFinite(prev)) return 0;
+      if (cur > prev) return 0.5;
+      if (cur < prev) return -0.5;
+      return 0;
+    }
+
+    function renderKDCell(s) {
+      const k0 = kdValue(s, 0);
+      const k1 = kdValue(s, 1);
+      const k2 = kdValue(s, 2);
+      const k3 = kdValue(s, 3);
+      const score = kdDayScore(s);
+      const k0Class = isNil(k1) ? "" : chipValueClass(k0, k1);
+      return `
+        <td>
+          <div class="table-lv1 ${trendClass(score)}">${fmtTrend(score)}</div>
+          <div class="table-lv2 ${k0Class}">K ${fmt(k0)}</div>
+          <div class="table-lv2">D ${fmt(s.d)}</div>
+          ${kdLine(s, 1, k1, k2)}
+          ${kdLine(s, 2, k2, k3)}
+        </td>`;
+    }
+
+    function renderKDBlock(s) {
+      const k0 = kdValue(s, 0);
+      const k1 = kdValue(s, 1);
+      const k2 = kdValue(s, 2);
+      const k3 = kdValue(s, 3);
+      const score = kdDayScore(s);
+      const k0Class = isNil(k1) ? "" : chipValueClass(k0, k1);
+      return `<div class="stock-value">
+        <div class="table-lv1 ${trendClass(score)}">${fmtTrend(score)}</div>
+        <div class="table-lv2 ${k0Class}">K ${fmt(k0)} / D ${fmt(s.d)}</div>
+        ${kdLine(s, 1, k1, k2)}
+        ${kdLine(s, 2, k2, k3)}
+      </div>`;
+    }
+
+    function priceLHValue(s, idx, kind) {
+      const field = kind === "low" ? "min" : "max";
+      const legacy = kind === "low" ? "low" : "high";
+      if (idx === 0) {
+        return pickFirst(s[`price_${field}_t0`], s[`price_${legacy}_t0`], kind === "low" ? s.price_min : s.price_max);
+      }
+      if (idx === 1) {
+        return pickFirst(s[`price_${field}_t1`], s[`price_${legacy}_t1`], s[`prev_price_${field}`], s[`prev_${legacy}`]);
+      }
+      if (idx === 2) {
+        return pickFirst(s[`price_${field}_t2`], s[`price_${legacy}_t2`], s[`prev2_price_${field}`], s[`prev2_${legacy}`]);
+      }
+      if (idx === 3) {
+        return pickFirst(s[`price_${field}_t3`], s[`price_${legacy}_t3`], s[`prev3_price_${field}`], s[`prev3_${legacy}`]);
+      }
+      return null;
+    }
+
+    function priceLHTrendScore(s) {
+      const low0 = priceLHValue(s, 0, "low");
+      const high0 = priceLHValue(s, 0, "high");
+      const low1 = priceLHValue(s, 1, "low");
+      const high1 = priceLHValue(s, 1, "high");
+      const low2 = priceLHValue(s, 2, "low");
+      const high2 = priceLHValue(s, 2, "high");
+      if ([low0, high0, low1, high1, low2, high2].some(isNil)) return null;
+      const higherHighs = Number(high0) > Number(high1) && Number(high1) > Number(high2);
+      const higherLows = Number(low0) > Number(low1) && Number(low1) > Number(low2);
+      const lowerHighs = Number(high0) < Number(high1) && Number(high1) < Number(high2);
+      const lowerLows = Number(low0) < Number(low1) && Number(low1) < Number(low2);
+      if (higherHighs && higherLows) return 1;
+      if (lowerHighs && lowerLows) return -1;
+      return 0;
+    }
+
+    function priceLHTrendLabel(score) {
+      if (isNil(score)) return "-";
+      if (score > 0) return "高高";
+      if (score < 0) return "低低";
+      return "盤整";
+    }
+
+    function renderPriceLHLine(s, idx, previousIdx) {
+      const low = priceLHValue(s, idx, "low");
+      const high = priceLHValue(s, idx, "high");
+      const previousLow = previousIdx === undefined ? undefined : priceLHValue(s, previousIdx, "low");
+      const previousHigh = previousIdx === undefined ? undefined : priceLHValue(s, previousIdx, "high");
+      const lowCls = previousIdx === undefined ? "" : chipValueClass(low, previousLow);
+      const highCls = previousIdx === undefined ? "" : chipValueClass(high, previousHigh);
+      const label = dayDateMMDD(s, idx, "price");
+      return `
+        <div class="table-lv2 price-lh-line">
+          <span class="price-lh-date">${escapeHtml(label)}：</span>
+          <span class="${lowCls}">低 ${fmt(low)}</span>
+          <span class="${highCls}">高 ${fmt(high)}</span>
+        </div>`;
+    }
+
+    function renderPriceLHTrendCell(s) {
+      const score = priceLHTrendScore(s);
+      return `
+        <td>
+          <div class="table-lv1 ${trendClass(score)}">${priceLHTrendLabel(score)}</div>
+          ${renderPriceLHLine(s, 0, 1)}
+          ${renderPriceLHLine(s, 1, 2)}
+          ${renderPriceLHLine(s, 2, 3)}
+        </td>`;
+    }
+
+    function renderPriceLHTrendBlock(s) {
+      const score = priceLHTrendScore(s);
+      return `<div class="stock-value">
+        <div class="table-lv1 ${trendClass(score)}">${priceLHTrendLabel(score)}</div>
+        ${renderPriceLHLine(s, 0, 1)}
+        ${renderPriceLHLine(s, 1, 2)}
+        ${renderPriceLHLine(s, 2, 3)}
+      </div>`;
+    }
+
     function renderChipConcentrationCell(s) {
       return `
         <td>
@@ -1096,6 +1267,8 @@
           return renderCodeCell(s);
         case "price":
           return `<td>${renderRangeMetric(s.price, s.price_60d_low, s.price_60d_high)}</td>`;
+        case "price_lh_trend":
+          return renderPriceLHTrendCell(s);
         case "resistance_price":
           return `<td class="sr-price-cell" title="${escapeHtml(supportResistanceTooltip("resistance"))}"><div class="table-lv1 text-red">${fmt(s.resistance_price)}</div><div class="table-lv2">${isNil(s.resistance_distance_pct) ? "-" : `+${fmt(s.resistance_distance_pct, "%")}`}</div></td>`;
         case "support_price":
@@ -1147,13 +1320,16 @@
           return `<td>${renderRangeMetric(s.per_latest, s.per_60d_low, s.per_60d_high)}</td>`;
         case "pbr_latest":
           return `<td>${renderRangeMetric(s.pbr_latest, s.pbr_60d_low, s.pbr_60d_high)}</td>`;
-        case "k":
+        case "k": {
+          if (currentTab === "technical") return renderKDCell(s);
+          const score = kdDayScore(s);
           return `
             <td>
-              <div class="table-lv1 ${trendClass(s.kd_score)}">${fmtTrend(s.kd_score)}</div>
+              <div class="table-lv1 ${trendClass(score)}">${fmtTrend(score)}</div>
               <div class="table-lv2">K ${fmt(s.k)}</div>
               <div class="table-lv2">D ${fmt(s.d)}</div>
             </td>`;
+        }
         case "bb_pct":
           return `
             <td>
@@ -1210,7 +1386,8 @@
       const technicalGrid = `
         <div class="stock-grid">
           <div class="stock-item"><div class="stock-label">漲跌% / 震幅% LH</div><div class="stock-value">${renderChangePctBlock(s)}</div></div>
-          <div class="stock-item"><div class="stock-label">日KD 3天趨勢</div><div class="stock-value"><div class="table-lv1 ${trendClass(s.kd_score)}">${fmtTrend(s.kd_score)}</div><div class="table-lv2">K ${fmt(s.k)} / D ${fmt(s.d)}</div></div></div>
+          <div class="stock-item"><div class="stock-label">價格LH 3天趨勢</div>${renderPriceLHTrendBlock(s)}</div>
+          <div class="stock-item"><div class="stock-label">日KD 3天趨勢</div>${renderKDBlock(s)}</div>
           <div class="stock-item"><div class="stock-label">日布林% LH</div><div class="stock-value"><div class="table-lv1 ${trendClass(s.bb_score)}">${fmtTrend(s.bb_score)}</div>${renderRangeMetric(s.bb_pct, s.bb_lower, s.bb_upper)}</div></div>
           <div class="stock-item"><div class="stock-label">日Bias6 LH</div><div class="stock-value">${renderRangeMetric(s.bias6, s.bias6_min, s.bias6_max, "%", distClass(s.bias6))}</div></div>
           <div class="stock-item"><div class="stock-label">日Bias18 LH</div><div class="stock-value">${renderRangeMetric(s.bias18, s.bias18_min, s.bias18_max, "%", distClass(s.bias18))}</div></div>
@@ -1241,7 +1418,7 @@
       const overviewGrid = `
         <div class="stock-grid">
           <div class="stock-item"><div class="stock-label">EPS / TTM</div><div class="stock-value"><div class="table-lv1">${fmt(s.eps_Y)}</div><div class="table-lv2">${fmt(s.eps_ttm)}</div></div></div>
-          <div class="stock-item"><div class="stock-label">日KD</div><div class="stock-value"><div class="table-lv1 ${trendClass(s.kd_score)}">${fmtTrend(s.kd_score)}</div><div class="table-lv2">K ${fmt(s.k)} / D ${fmt(s.d)}</div></div></div>
+          <div class="stock-item"><div class="stock-label">日KD</div><div class="stock-value"><div class="table-lv1 ${trendClass(kdDayScore(s))}">${fmtTrend(kdDayScore(s))}</div><div class="table-lv2">K ${fmt(s.k)} / D ${fmt(s.d)}</div></div></div>
           <div class="stock-item"><div class="stock-label">日布林% LH</div><div class="stock-value"><div class="table-lv1 ${trendClass(s.bb_score)}">${fmtTrend(s.bb_score)}</div>${renderRangeMetric(s.bb_pct, s.bb_lower, s.bb_upper)}</div></div>
           <div class="stock-item"><div class="stock-label">量 / 昨 / 增 / 張</div><div class="stock-value"><div>${fmt(s.volume)} 張</div><div class="table-lv2">昨 ${fmt(s.prev_volume)}</div><div class="table-lv2 ${trendClass(s.volume_ratio)}">${isNil(s.volume_ratio) ? "-" : `${fmtTrend(s.volume_ratio)} ${fmt(s.volume_ratio, "%")}`}</div><div class="table-lv2">${isNil(s.volume_add) ? "-" : `${fmt(s.volume_add)} 張`}</div></div></div>
         </div>`;
@@ -1282,6 +1459,10 @@
           return s.code ?? "";
         case "sig":
           return Number(s.sig ?? -999999);
+        case "price_lh_trend": {
+          const score = priceLHTrendScore(s);
+          return isNil(score) ? -999999 : Number(score);
+        }
         case "yield_value":
           return Number(((s.yield_value ?? 0) * 0.65).toFixed(4));
         case "per_latest":
@@ -1460,4 +1641,6 @@
 
 
 
-</body></html>
+</body>
+
+</html>

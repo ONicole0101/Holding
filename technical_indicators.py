@@ -46,7 +46,7 @@ def add_indicators(df):
 
 def get_kd_trend(df):
     if 'K' not in df.columns or 'D' not in df.columns:
-        return {"kd_3d_up": None, "kd_trend": None, "kd_score": None}
+        return {"kd_3d_up": None, "kd_trend": None}
     try:
         last3 = df.tail(3)
 
@@ -54,8 +54,7 @@ def get_kd_trend(df):
         if len(last3) < 3:
             return {
                 "kd_3d_up": None,
-                "kd_trend": None,
-                "kd_score": None
+                "kd_trend": None
             }
 
         k_vals = last3['K'].values
@@ -65,8 +64,7 @@ def get_kd_trend(df):
         if pd.isna(k_vals).any() or pd.isna(d_vals).any():
             return {
                 "kd_3d_up": None,
-                "kd_trend": None,
-                "kd_score": None
+                "kd_trend": None
             }
 
         # === K 三日趨勢 ===
@@ -87,32 +85,25 @@ def get_kd_trend(df):
         # === 趨勢判斷 ===
         if cross_up:
             trend = "↑"       # 強烈買訊
-            score = 2
         elif cross_down:
             trend = "↓"       # 強烈賣訊
-            score = -2
         elif k_up:
             trend = "↗"
-            score = 1
         elif k_down:
             trend = "↘"
-            score = -1
         else:
             trend = "→"
-            score = 0
 
         return {
             "kd_3d_up": k_up if k_up is not None else None,
             "kd_trend": trend,
-            "kd_score": score,
         }
 
     except Exception as e:
         print(f"❌ KD trend error: {e}")
         return {
             "kd_3d_up": None,
-            "kd_trend": None,
-            "kd_score": None
+            "kd_trend": None
         }
 
 

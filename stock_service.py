@@ -195,6 +195,51 @@ def to_str_or_none(v):
     return text if text and text.lower() not in {"nan", "none", "null"} else None
 
 
+def round_float_or_none(v, ndigits=2):
+    if v is None:
+        return None
+    try:
+        if pd.isna(v):
+            return None
+    except Exception:
+        pass
+    try:
+        return float(round(float(v), ndigits))
+    except Exception:
+        return None
+
+
+def date_text_or_none(v):
+    if v is None:
+        return None
+    try:
+        if pd.isna(v):
+            return None
+    except Exception:
+        pass
+    if hasattr(v, "strftime"):
+        return v.strftime("%Y-%m-%d")
+    text = str(v).strip()
+    if not text or text.lower() in {"nan", "none", "null"}:
+        return None
+    return text[:10]
+
+
+def build_recent_technical_fields(*rows):
+    fields = {}
+    for idx, row in enumerate(rows):
+        suffix = f"t{idx}"
+        date_text = date_text_or_none(row.get("date"))
+        fields[f"date_{suffix}"] = date_text
+        fields[f"kd_date_{suffix}"] = date_text
+        fields[f"price_date_{suffix}"] = date_text
+        fields[f"k_{suffix}"] = round_float_or_none(row.get("K"), 1)
+        fields[f"d_{suffix}"] = round_float_or_none(row.get("D"), 1)
+        fields[f"price_min_{suffix}"] = round_float_or_none(row.get("min"), 2)
+        fields[f"price_max_{suffix}"] = round_float_or_none(row.get("max"), 2)
+    return fields
+
+
 def process_stock(s, static_map=None, chips_map=None, news_map=None):
     stock_id = str(s["stock_id"])
     name = s["name"]
@@ -262,7 +307,8 @@ def process_stock(s, static_map=None, chips_map=None, news_map=None):
             return x
 
         df = add_indicators(df)
-        latest, prev = df.iloc[-1], df.iloc[-2]
+        latest, prev, prev2, prev3 = df.iloc[-1], df.iloc[-2], df.iloc[-3], df.iloc[-4]
+        recent_technical_fields = build_recent_technical_fields(latest, prev, prev2, prev3)
         price_stats = get_price_60d_high_low(df)
         support_resistance = get_support_resistance_levels(df)
         max_price = latest["max"]
@@ -304,20 +350,11 @@ def process_stock(s, static_map=None, chips_map=None, news_map=None):
         d = float(latest["D"]) if pd.notna(latest["D"]) else None
         prev_k = float(prev["K"]) if pd.notna(prev["K"]) else None
         prev_d = float(prev["D"]) if pd.notna(prev["D"]) else None
-
-        kd_score = 0
-        if None not in (k, d, prev_k, prev_d):
-            if k > d and prev_k <= prev_d:
-                kd_score = 1
-            elif k < d and prev_k >= prev_d:
-                kd_score = -1
-            elif k > d:
-                kd_score = 0.5
-            elif k < d:
-                kd_score = -0.5
+        prev2_k = float(prev2["K"]) if pd.notna(prev2["K"]) else None
+        prev2_d = float(prev2["D"]) if pd.notna(prev2["D"]) else None
 
         kd_trend = get_kd_trend(
-            df) or {"kd_3d_up": None, "kd_trend": None, "kd_score": None}
+            df) or {"kd_3d_up": None, "kd_trend": None}
         bb_trend = get_bb_trend(
             df) or {"bb_3d_up": None, "bb_trend": None, "bb_score": None}
         k_trend = kd_trend.get("kd_trend")
@@ -336,7 +373,6 @@ def process_stock(s, static_map=None, chips_map=None, news_map=None):
 
         volume = latest.get("volume", None)
         prev_volume = prev.get("volume", None)
-        prev2 = df.iloc[-3]
         prev2_volume = prev2.get("volume", None)
         volume_ratio = None
         volume_add = None
@@ -493,16 +529,20 @@ def process_stock(s, static_map=None, chips_map=None, news_map=None):
             **static_fields,
             **chip_fields,
             **news_fields,
+            **recent_technical_fields,
 
             "dividend": float(dividend) if dividend is not None else None,
             "yield_value": float(yield_value) if yield_value is not None and not pd.isna(yield_value) else None,
             "k": float(round(k, 1)) if k is not None else None,
             "d": float(round(d, 1)) if d is not None else None,
+            "prev_k": float(round(prev_k, 1)) if prev_k is not None else None,
+            "prev_d": float(round(prev_d, 1)) if prev_d is not None else None,
+            "prev2_k": float(round(prev2_k, 1)) if prev2_k is not None else None,
+            "prev2_d": float(round(prev2_d, 1)) if prev2_d is not None else None,
             "kd_3d_up": kd_trend.get("kd_3d_up"),
             "kd_trend": kd_trend.get("kd_trend"),
             "k_trend": k_trend,
             "d_trend": d_trend,
-            "kd_score": float(kd_score),
             "ma18": float(round(ma18, 2)) if ma18 is not None else None,
             "ma18_break": bool(ma18_break),
             "kd_buy": bool(kd_buy),
