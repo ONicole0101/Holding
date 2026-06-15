@@ -1,29 +1,29 @@
-[32m2026-06-12 10:42:11.765[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
-[32m2026-06-12 10:42:11.905[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
-FinMind: token=True, login=ok, usage=1520/6000, remain=4480
+[32m2026-06-15 12:39:58.053[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
+[32m2026-06-15 12:39:58.166[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
+FinMind: token=True, login=ok, usage=0/6000, remain=6000
 Build chips: total=22, workers=6, trend_days=3, threshold=15, lookback_days=21, output=AllStatic_Chips.csv
 stock_id  name chip_latest_date main_force_net broker_diff   chip_signal_state chips_status
-    1101    台泥       2026-06-12        1427486        -102 bullish_distributed           ok
-    1216    統一       2026-06-12        3630240        -366             neutral           ok
-    1319    東陽       2026-06-12        -365900          84             neutral           ok
-    1532    勤美       2026-06-12         111308         -40             neutral           ok
-    2317    鴻海       2026-06-12       -1503918          -1             bearish           ok
-    2330   台積電       2026-06-12        2506822          -3             neutral           ok
-    2454   聯發科       2026-06-12         102862          -5             neutral           ok
-    2881   富邦金       2026-06-12       -2101327         112             neutral           ok
-    2885   元大金       2026-06-12        5192717        -223             neutral           ok
-    2891   中信金       2026-06-12        -476371          81 bearish_distributed           ok
-    3017    奇鋐       2026-06-12          53099          40             neutral           ok
-    3324    雙鴻       2026-06-12         405400         -33             neutral           ok
-    3443    創意       2026-06-12          -3957         -72             bearish           ok
-    3563    牧德       2026-06-12         -10010          94             neutral           ok
-    3653    健策       2026-06-12          78936          85             neutral           ok
-    3665 貿聯-KY       2026-06-12         212544        -102             neutral           ok
-    5871 中租-KY       2026-06-12          77110          30 bullish_distributed           ok
-    6442    光聖       2026-06-12            971         113             neutral           ok
-    6510    精測       2026-06-12          95415        -222             neutral           ok
-    6515    穎崴       2026-06-12         181902        -380             neutral           ok
-    6940 格斯科技*       2026-06-12         -55154          57             bearish           ok
-    7728  光焱科技       2026-06-12         -11000          22             neutral           ok
+    1101    台泥       2026-06-15        1274001         -50 bullish_distributed           ok
+    1216    統一       2026-06-15        -351976        -117             neutral           ok
+    1319    東陽       2026-06-15        1033263        -227             neutral           ok
+    1532    勤美       2026-06-15         367000         -90             neutral           ok
+    2317    鴻海       2026-06-15        3385301          -1             neutral           ok
+    2330   台積電       2026-06-15        5347152         -10             neutral           ok
+    2454   聯發科       2026-06-15         297223         -18             neutral           ok
+    2881   富邦金       2026-06-15        6039550        -128             neutral           ok
+    2885   元大金       2026-06-15         752690         -64             neutral           ok
+    2891   中信金       2026-06-15       -2954043        -109             bearish           ok
+    3017    奇鋐       2026-06-15         -54091          85             neutral           ok
+    3324    雙鴻       2026-06-15        -116102          63             neutral           ok
+    3443    創意       2026-06-15         454658        -366             neutral           ok
+    3563    牧德       2026-06-15         -19523         126             neutral           ok
+    3653    健策       2026-06-15          67513        -176             neutral           ok
+    3665 貿聯-KY       2026-06-15          71189          75             neutral           ok
+    5871 中租-KY       2026-06-15       -1698698         241             neutral           ok
+    6442    光聖       2026-06-15         -34365          69             neutral           ok
+    6510    精測       2026-06-15           6589        -148             neutral           ok
+    6515    穎崴       2026-06-15           3947        -252             neutral           ok
+    6940 格斯科技*       2026-06-15          21000           8             neutral           ok
+    7728  光焱科技       2026-06-15         -10970          58 bearish_distributed           ok
 rows= 22
 status= {'ok': 22}
