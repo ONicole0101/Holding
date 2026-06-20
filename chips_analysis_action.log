@@ -1,9 +1,7 @@
-[32m2026-06-19 10:55:31.827[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
-[32m2026-06-19 10:55:31.951[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
-FinMind: token=True, login=ok, usage=0/6000, remain=6000
-Build chips: total=22, workers=6, trend_days=3, threshold=15, lookback_days=21, output=AllStatic_Chips.csv
-[22/22] 6515 穎崴 status=ok date=2026-06-18 main=-5000 diff=86 state=neutral
-Done: rows=22, status={'ok': 22}, elapsed=52.0s, output=AllStatic_Chips.csv
+[32m2026-06-20 17:04:11.186[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
+[32m2026-06-20 17:04:11.354[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
+FinMind: token=True, login=ok, usage=227/6000, remain=5773
+Build chips: total=23, workers=6, trend_days=3, threshold=15, lookback_days=21, output=AllStatic_Chips.csv
 stock_id  name chip_latest_date main_force_net broker_diff   chip_signal_state chips_status
     1101    台泥       2026-06-18       -3419958          80 bearish_distributed           ok
     1216    統一       2026-06-18        -219482         299             neutral           ok
@@ -18,6 +16,7 @@ stock_id  name chip_latest_date main_force_net broker_diff   chip_signal_state c
     3017    奇鋐       2026-06-18         207333          72             neutral           ok
     3324    雙鴻       2026-06-18         -28453          35             neutral           ok
     3443    創意       2026-06-18        -160863          84             bearish           ok
+    3491   昇達科       2026-06-18        -142495         205 bearish_distributed           ok
     3563    牧德       2026-06-18         -21632         137             neutral           ok
     3653    健策       2026-06-18         107604          -6             neutral           ok
     3665 貿聯-KY       2026-06-18         140676         150             neutral           ok
@@ -27,5 +26,5 @@ stock_id  name chip_latest_date main_force_net broker_diff   chip_signal_state c
     6515    穎崴       2026-06-18          -5000          86             neutral           ok
     6940 格斯科技*       2026-06-18          58957         -14             neutral           ok
     7728  光焱科技       2026-06-18          -1950          36 bearish_distributed           ok
-rows= 22
-status= {'ok': 22}
+rows= 23
+status= {'ok': 23}
