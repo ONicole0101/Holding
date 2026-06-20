@@ -13,9 +13,9 @@ TECH_COLUMNS = [
     {"key": "position_zone", "label": "位階"},
     {"key": "price_volume_state", "label": "價量"},
     {"key": "trend_stage", "label": "趨勢階段"},
-    {"key": "ma6", "label": "MA6"},
-    {"key": "ma18", "label": "MA18"},
-    {"key": "ma50", "label": "MA50"},
+    {"key": "ma5", "label": "MA5"},
+    {"key": "ma20", "label": "MA20"},
+    {"key": "ma60", "label": "MA60"},
     {"key": "macd_hist", "label": "MACD柱"},
 ]
 
@@ -24,7 +24,7 @@ def enrich_html_fields(results):
     """補上 HTML 可直接顯示的技術摘要欄位。
 
     template.html 若要顯示新增欄位，可直接讀：
-    tech_summary / position_zone / price_volume_state / trend_stage / ma6 / ma18 / ma50 / macd_hist。
+    tech_summary / position_zone / price_volume_state / trend_stage / ma5 / ma20 / ma60 / macd_hist。
     """
     out = []
     for item in results:

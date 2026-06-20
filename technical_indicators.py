@@ -39,9 +39,9 @@ def add_indicators(df):
         rsv = pd.to_numeric(rsv, errors="coerce").ffill()
         df['K'], df['D'] = calculate_kd(rsv)
 
-        df['MA6'] = df['close'].rolling(6).mean()
-        df['MA18'] = df['close'].rolling(18).mean()
-        df['MA50'] = df['close'].rolling(50).mean()
+        df['MA5'] = df['close'].rolling(5).mean()
+        df['MA20'] = df['close'].rolling(20).mean()
+        df['MA60'] = df['close'].rolling(60).mean()
 
         # MACD: 用於判斷主升段動能是否翻正、改善或降溫。
         # DIF = EMA12 - EMA26, DEA = DIF 的 9 日 EMA, HIST = DIF - DEA。
@@ -51,20 +51,20 @@ def add_indicators(df):
         df['MACD_DEA'] = df['MACD_DIF'].ewm(span=9, adjust=False).mean()
         df['MACD_HIST'] = df['MACD_DIF'] - df['MACD_DEA']
 
-        std = df['close'].rolling(18).std()
-        df['BB_upper'] = df['MA18'] + 2 * std
-        df['BB_lower'] = df['MA18'] - 2 * std
+        std = df['close'].rolling(20).std()
+        df['BB_upper'] = df['MA20'] + 2 * std
+        df['BB_lower'] = df['MA20'] - 2 * std
 
-        df['BIAS6'] = (df['close'] - df['MA6']) / df['MA6'] * 100
-        df['BIAS18'] = (df['close'] - df['MA18']) / df['MA18'] * 100
-        df['BIAS50'] = (df['close'] - df['MA50']) / df['MA50'] * 100
+        df['BIAS5'] = (df['close'] - df['MA5']) / df['MA5'] * 100
+        df['BIAS20'] = (df['close'] - df['MA20']) / df['MA20'] * 100
+        df['BIAS60'] = (df['close'] - df['MA60']) / df['MA60'] * 100
 
-        df['BIAS6_60D_HIGH'] = df['BIAS6'].rolling(60, min_periods=30).max()
-        df['BIAS6_60D_LOW'] = df['BIAS6'].rolling(60, min_periods=30).min()
-        df['BIAS18_60D_HIGH'] = df['BIAS18'].rolling(60, min_periods=30).max()
-        df['BIAS18_60D_LOW'] = df['BIAS18'].rolling(60, min_periods=30).min()
-        df['BIAS50_60D_HIGH'] = df['BIAS50'].rolling(60, min_periods=30).max()
-        df['BIAS50_60D_LOW'] = df['BIAS50'].rolling(60, min_periods=30).min()
+        df['BIAS5_60D_HIGH'] = df['BIAS5'].rolling(60, min_periods=30).max()
+        df['BIAS5_60D_LOW'] = df['BIAS5'].rolling(60, min_periods=30).min()
+        df['BIAS20_60D_HIGH'] = df['BIAS20'].rolling(60, min_periods=30).max()
+        df['BIAS20_60D_LOW'] = df['BIAS20'].rolling(60, min_periods=30).min()
+        df['BIAS60_60D_HIGH'] = df['BIAS60'].rolling(60, min_periods=30).max()
+        df['BIAS60_60D_LOW'] = df['BIAS60'].rolling(60, min_periods=30).min()
 
         return df
     except Exception as e:
@@ -138,14 +138,14 @@ def get_kd_trend(df):
 def get_MABias(df):
     if len(df) < 60:
         return {
-            'ma6': None, 'ma18': None, 'ma50': None,
-            'bias6': None, 'bias18': None, 'bias50': None,
-            'bias6_min': None, 'bias6_max': None,
-            'bias18_min': None, 'bias18_max': None,
-            'bias50_min': None, 'bias50_max': None,
+            'ma5': None, 'ma20': None, 'ma60': None,
+            'bias5': None, 'bias20': None, 'bias60': None,
+            'bias5_min': None, 'bias5_max': None,
+            'bias20_min': None, 'bias20_max': None,
+            'bias60_min': None, 'bias60_max': None,
         }
 
-    periods = [6, 18, 50]
+    periods = [5, 20, 60]
     stats = {}
 
     for p in periods:
@@ -219,15 +219,22 @@ def safe_pos(value, low, high):
 
 
 
-def get_support_resistance_levels(df, lookback_days=120, pivot_window=5, tolerance_pct=1.2):
+def get_support_resistance_levels(
+    df,
+    lookback_days=None,
+    pivot_window=5,
+    tolerance_pct=1.2,
+    min_distance_pct=0.2,
+    price_bands_pct=(8, 15, 25, 40, None),
+):
     """
     Use FinMind TaiwanStockPrice OHLCV data to estimate nearby resistance/support.
 
     Logic:
-    - Use recent OHLCV rows only, default last 120 trading days.
+    - Use all available OHLCV rows by default instead of a fixed day window.
     - Find swing highs as resistance candidates and swing lows as support candidates.
     - Merge nearby prices into clusters by tolerance_pct so repeated tests become one level.
-    - Pick the nearest cluster above latest close as resistance, and nearest cluster below latest close as support.
+    - Search from the current price zone outward, then pick the nearest valid cluster.
 
     Returned prices are rounded to 2 decimals and safe for JSON/template rendering.
     """
@@ -298,6 +305,76 @@ def get_support_resistance_levels(df, lookback_days=120, pivot_window=5, toleran
             })
         return result
 
+    def _date_rank(value):
+        try:
+            if value is None or pd.isna(value):
+                return 0
+            return pd.Timestamp(value).timestamp()
+        except Exception:
+            return 0
+
+    def _select_nearest_cluster(candidates, side, latest_close, tolerance):
+        side_candidates = []
+        min_distance = max(float(min_distance_pct or 0), 0) / 100
+
+        for item in candidates:
+            price = _safe_float(item.get("price"))
+            if price is None or price <= 0:
+                continue
+            if side == "resistance":
+                distance = (price - latest_close) / latest_close
+            else:
+                distance = (latest_close - price) / latest_close
+            if distance < min_distance:
+                continue
+            enriched = dict(item)
+            enriched["distance_pct"] = distance * 100
+            side_candidates.append(enriched)
+
+        if not side_candidates:
+            return None
+
+        for band in price_bands_pct:
+            if band is None:
+                band_candidates = side_candidates
+            else:
+                band_candidates = [
+                    item for item in side_candidates
+                    if item["distance_pct"] <= float(band)
+                ]
+            if not band_candidates:
+                continue
+
+            clusters = _cluster_levels(band_candidates, tolerance)
+            valid_clusters = []
+            for cluster in clusters:
+                price = _safe_float(cluster.get("price"))
+                if price is None or price <= 0:
+                    continue
+                if side == "resistance":
+                    distance = (price - latest_close) / latest_close
+                else:
+                    distance = (latest_close - price) / latest_close
+                if distance < min_distance:
+                    continue
+                distance_pct = distance * 100
+                if band is not None and distance_pct > float(band):
+                    continue
+                cluster["distance_pct"] = distance_pct
+                valid_clusters.append(cluster)
+
+            if valid_clusters:
+                return min(
+                    valid_clusters,
+                    key=lambda c: (
+                        c["distance_pct"],
+                        -int(c.get("touch_count") or 0),
+                        -_date_rank(c.get("last_date")),
+                    ),
+                )
+
+        return None
+
     try:
         if df is None or df.empty:
             return empty
@@ -318,11 +395,13 @@ def get_support_resistance_levels(df, lookback_days=120, pivot_window=5, toleran
         if data.empty:
             return empty
 
-        window = data.tail(max(int(lookback_days or 120), 20)).copy()
+        window = data.copy()
+        if lookback_days:
+            window = data.tail(max(int(lookback_days), 20)).copy()
         if window.empty:
             return empty
 
-        latest_close = _safe_float(window["close"].iloc[-1])
+        latest_close = _safe_float(data["close"].iloc[-1])
         if latest_close is None or latest_close <= 0:
             return empty
 
@@ -338,13 +417,19 @@ def get_support_resistance_levels(df, lookback_days=120, pivot_window=5, toleran
 
         resistance_candidates = []
         support_candidates = []
+        resistance_seen = set()
+        support_seen = set()
 
-        def _append_candidate(target, row, price_col):
+        def _append_candidate(target, seen, row, price_col):
             price = _safe_float(row.get(price_col))
             if price is None or price <= 0:
                 return
             volume = _safe_float(row.get("volume")) if "volume" in row.index else None
             date_value = row.get("date") if "date" in row.index else None
+            key = (round(price, 4), str(date_value)[:10], price_col)
+            if key in seen:
+                return
+            seen.add(key)
             target.append({
                 "price": price,
                 "weight": volume if volume and volume > 0 else 1,
@@ -352,28 +437,27 @@ def get_support_resistance_levels(df, lookback_days=120, pivot_window=5, toleran
             })
 
         for _, row in pivot_highs.iterrows():
-            price = _safe_float(row.get("max"))
-            if price is not None and price >= latest_close:
-                _append_candidate(resistance_candidates, row, "max")
+            _append_candidate(resistance_candidates, resistance_seen, row, "max")
 
         for _, row in pivot_lows.iterrows():
-            price = _safe_float(row.get("min"))
-            if price is not None and price <= latest_close:
-                _append_candidate(support_candidates, row, "min")
+            _append_candidate(support_candidates, support_seen, row, "min")
 
-        # Add recent range extremes as fallbacks so the fields still work when few pivots exist.
-        high_60 = _safe_float(window.tail(60)["max"].max())
-        low_60 = _safe_float(window.tail(60)["min"].min())
-        if high_60 is not None and high_60 >= latest_close:
-            resistance_candidates.append({"price": high_60, "weight": 1, "date": None})
-        if low_60 is not None and low_60 <= latest_close:
-            support_candidates.append({"price": low_60, "weight": 1, "date": None})
+        def _append_extreme(target, seen, frame, price_col, pick):
+            if frame.empty or price_col not in frame.columns:
+                return
+            series = pd.to_numeric(frame[price_col], errors="coerce").dropna()
+            if series.empty:
+                return
+            idx = series.idxmax() if pick == "max" else series.idxmin()
+            _append_candidate(target, seen, frame.loc[idx], price_col)
 
-        resistance_clusters = [c for c in _cluster_levels(resistance_candidates, tolerance) if c["price"] >= latest_close]
-        support_clusters = [c for c in _cluster_levels(support_candidates, tolerance) if c["price"] <= latest_close]
+        for span in (20, 60, 120, None):
+            frame = window if span is None else window.tail(min(int(span), len(window)))
+            _append_extreme(resistance_candidates, resistance_seen, frame, "max", "max")
+            _append_extreme(support_candidates, support_seen, frame, "min", "min")
 
-        resistance = min(resistance_clusters, key=lambda c: (c["price"] - latest_close, -c["touch_count"]), default=None)
-        support = max(support_clusters, key=lambda c: (c["price"], c["touch_count"]), default=None)
+        resistance = _select_nearest_cluster(resistance_candidates, "resistance", latest_close, tolerance)
+        support = _select_nearest_cluster(support_candidates, "support", latest_close, tolerance)
 
         result = empty.copy()
         if resistance:
