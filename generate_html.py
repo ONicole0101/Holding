@@ -162,15 +162,6 @@ def main():
         now_str = now_dt.strftime("%m%d%H%M")
         filename = f"{output_file}_{now_str}.html"
 
-        repo_full = os.getenv("GITHUB_REPOSITORY", "nicole0101/Holding")
-        branch = os.getenv("GITHUB_REF_NAME", "main")
-        user, repo = repo_full.split("/")
-
-        if branch == "main":
-            file_url = f"https://{user}.github.io/{repo}/{filename}"
-        else:
-            file_url = f"https://github.com/{user}/{repo}/blob/{branch}/{filename}"
-
         if report_type == "Holding":
             report_subtitle = "持股追蹤與風險檢視"
         elif report_type == "Gold":
@@ -205,8 +196,6 @@ def main():
             print(f"❌ HTML 生成失敗: {e}")
             return
 
-        send_line_notify(data, file_url, report_title, report_type)
-
     finally:
         try:
             print("📊 執行後查詢 FinMind 使用量...")
@@ -217,50 +206,6 @@ def main():
                 )
         except Exception as e:
             print(f"⚠️ 無法查詢執行後 FinMind 使用量: {e}")
-
-
-def send_line_notify(data, file_url, report_title, report_type):
-    try:
-        from line_push import send_line
-
-        stocks = [
-            s for s in data.get("stocks", [])
-            if isinstance(s.get("chgPct"), (int, float))
-        ]
-
-        top5 = [f"{s['name']}({s['chgPct']}%)" for s in stocks[:5]]
-        weak5 = [f"{s['name']}({s['chgPct']}%)" for s in stocks[-5:]]
-
-        if report_type == "Holding":
-            report_header = "📊 持股追蹤分析報告"
-            strong_label = "🔥 強勢持股"
-            weak_label = "⚠ 弱勢持股"
-        elif report_type == "Gold":
-            report_header = "📊 黃金股觀察報告"
-            strong_label = "🔥 強勢黃金股"
-            weak_label = "⚠ 弱勢黃金股"
-        else:
-            report_header = f"📊 {report_title}"
-            strong_label = "🔥 強勢股"
-            weak_label = "⚠ 弱勢股"
-
-        msg = f"""
-{report_header}
-
-{strong_label}
-{chr(10).join(top5)}
-
-{weak_label}
-{chr(10).join(weak5)}
-
-📎 完整詳細報表：
-{file_url}
-        """
-        send_line(msg.strip())
-        print("✅ LINE 通知已發送")
-
-    except Exception as e:
-        print(f"⚠️ LINE 通知發送失敗: {e}")
 
 
 if __name__ == "__main__":
