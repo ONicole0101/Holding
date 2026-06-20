@@ -360,12 +360,12 @@ def process_stock(s, static_map=None, chips_map=None, news_map=None):
         k_trend = kd_trend.get("kd_trend")
         d_trend = None
 
-        ma6 = latest["MA6"] if "MA6" in latest and pd.notna(latest["MA6"]) else None
-        prev_ma6 = prev["MA6"] if "MA6" in prev and pd.notna(prev["MA6"]) else None
-        ma18 = latest["MA18"] if "MA18" in latest and pd.notna(latest["MA18"]) else None
-        prev_ma18 = prev["MA18"] if "MA18" in prev and pd.notna(prev["MA18"]) else None
-        ma50 = latest["MA50"] if "MA50" in latest and pd.notna(latest["MA50"]) else None
-        prev_ma50 = prev["MA50"] if "MA50" in prev and pd.notna(prev["MA50"]) else None
+        ma5 = latest["MA5"] if "MA5" in latest and pd.notna(latest["MA5"]) else None
+        prev_ma5 = prev["MA5"] if "MA5" in prev and pd.notna(prev["MA5"]) else None
+        ma20 = latest["MA20"] if "MA20" in latest and pd.notna(latest["MA20"]) else None
+        prev_ma20 = prev["MA20"] if "MA20" in prev and pd.notna(prev["MA20"]) else None
+        ma60 = latest["MA60"] if "MA60" in latest and pd.notna(latest["MA60"]) else None
+        prev_ma60 = prev["MA60"] if "MA60" in prev and pd.notna(prev["MA60"]) else None
         macd_hist = latest["MACD_HIST"] if "MACD_HIST" in latest and pd.notna(latest["MACD_HIST"]) else None
         prev_macd_hist = prev["MACD_HIST"] if "MACD_HIST" in prev and pd.notna(prev["MACD_HIST"]) else None
         close = latest["close"]
@@ -388,21 +388,21 @@ def process_stock(s, static_map=None, chips_map=None, news_map=None):
             bb_pct = round((close - bb_lower) / (bb_upper - bb_lower) * 100, 1)
             bb_pct = float(bb_pct)
 
-        bias6 = safe_ma_stats.get("bias6")
-        bias18 = safe_ma_stats.get("bias18")
-        bias50 = safe_ma_stats.get("bias50")
-        bias6_min = safe_ma_stats.get(
-            "bias6_60d_low") or safe_ma_stats.get("bias6_min")
-        bias6_max = safe_ma_stats.get(
-            "bias6_60d_high") or safe_ma_stats.get("bias6_max")
-        bias18_min = safe_ma_stats.get(
-            "bias18_60d_low") or safe_ma_stats.get("bias18_min")
-        bias18_max = safe_ma_stats.get(
-            "bias18_60d_high") or safe_ma_stats.get("bias18_max")
-        bias50_min = safe_ma_stats.get(
-            "bias50_60d_low") or safe_ma_stats.get("bias50_min")
-        bias50_max = safe_ma_stats.get(
-            "bias50_60d_high") or safe_ma_stats.get("bias50_max")
+        bias5 = safe_ma_stats.get("bias5")
+        bias20 = safe_ma_stats.get("bias20")
+        bias60 = safe_ma_stats.get("bias60")
+        bias5_min = safe_ma_stats.get(
+            "bias5_60d_low") or safe_ma_stats.get("bias5_min")
+        bias5_max = safe_ma_stats.get(
+            "bias5_60d_high") or safe_ma_stats.get("bias5_max")
+        bias20_min = safe_ma_stats.get(
+            "bias20_60d_low") or safe_ma_stats.get("bias20_min")
+        bias20_max = safe_ma_stats.get(
+            "bias20_60d_high") or safe_ma_stats.get("bias20_max")
+        bias60_min = safe_ma_stats.get(
+            "bias60_60d_low") or safe_ma_stats.get("bias60_min")
+        bias60_max = safe_ma_stats.get(
+            "bias60_60d_high") or safe_ma_stats.get("bias60_max")
 
         static_fields = _build_static_fields(static_row)
         chip_fields = _build_chip_fields(chip_row)
@@ -424,22 +424,22 @@ def process_stock(s, static_map=None, chips_map=None, news_map=None):
                 k_trend=k_trend,
                 d_trend=d_trend,
                 bb_pct=bb_pct,
-                bias6=bias6,
-                bias18=bias18,
-                bias50=bias50,
-                bias6_min=bias6_min,
-                bias6_max=bias6_max,
-                bias18_min=bias18_min,
-                bias18_max=bias18_max,
-                bias50_min=bias50_min,
-                bias50_max=bias50_max,
-                ma18=ma18,
-                prev_ma18=prev_ma18,
+                bias6=bias5,
+                bias18=bias20,
+                bias50=bias60,
+                bias6_min=bias5_min,
+                bias6_max=bias5_max,
+                bias18_min=bias20_min,
+                bias18_max=bias20_max,
+                bias50_min=bias60_min,
+                bias50_max=bias60_max,
+                ma18=ma20,
+                prev_ma18=prev_ma20,
                 prev_close=prev_close,
-                ma6=ma6,
-                prev_ma6=prev_ma6,
-                ma50=ma50,
-                prev_ma50=prev_ma50,
+                ma6=ma5,
+                prev_ma6=prev_ma5,
+                ma50=ma60,
+                prev_ma50=prev_ma60,
                 macd_hist=macd_hist,
                 prev_macd_hist=prev_macd_hist,
                 chip_signal_state=merged_static_fields.get("chip_signal_state"),
@@ -467,16 +467,16 @@ def process_stock(s, static_map=None, chips_map=None, news_map=None):
 
         kd_buy = bool(None not in (k, d, prev_k, prev_d)
                       and (prev_k <= prev_d) and (k > d))
-        ma18_break = bool(
-            ma18 is not None and prev_ma18 is not None and prev_close <= prev_ma18 and close > ma18
+        ma20_break = bool(
+            ma20 is not None and prev_ma20 is not None and prev_close <= prev_ma20 and close > ma20
         )
 
         entry_note = ""
         if "短線過熱" in reason or "不宜追價" in reason:
             entry_note = "不追價"
-        elif signal == "買進" and kd_buy and ma18_break and k is not None and k < 35:
+        elif signal == "買進" and kd_buy and ma20_break and k is not None and k < 35:
             entry_note = "抄底"
-        elif signal == "買進" and ma18_break and chgPct >= 3:
+        elif signal == "買進" and ma20_break and chgPct >= 3:
             entry_note = "追漲"
 
         margin_score = calc_margin_score(
@@ -543,8 +543,12 @@ def process_stock(s, static_map=None, chips_map=None, news_map=None):
             "kd_trend": kd_trend.get("kd_trend"),
             "k_trend": k_trend,
             "d_trend": d_trend,
-            "ma18": float(round(ma18, 2)) if ma18 is not None else None,
-            "ma18_break": bool(ma18_break),
+            "ma20": float(round(ma20, 2)) if ma20 is not None else None,
+            "prev_ma20": float(round(prev_ma20, 2)) if prev_ma20 is not None else None,
+            "ma20_break": bool(ma20_break),
+            "ma18": float(round(ma20, 2)) if ma20 is not None else None,
+            "prev_ma18": float(round(prev_ma20, 2)) if prev_ma20 is not None else None,
+            "ma18_break": bool(ma20_break),
             "kd_buy": bool(kd_buy),
             "bb_pct": float(bb_pct) if bb_pct is not None else None,
             "bb_upper": float(round(bb_upper, 2)) if bb_upper is not None and pd.notna(bb_upper) else None,
@@ -558,22 +562,35 @@ def process_stock(s, static_map=None, chips_map=None, news_map=None):
             "volume_ratio": float(volume_ratio) if volume_ratio is not None else None,
             "volume_add": volume_add if volume_add is not None else None,
 
-            "ma6": float(round(ma6, 2)) if ma6 is not None else safe_ma_stats.get("ma6"),
-            "prev_ma6": float(round(prev_ma6, 2)) if prev_ma6 is not None else None,
-            "bias6": bias6,
-            "bias6_min": bias6_min,
-            "bias6_max": bias6_max,
-            "bias18": bias18,
-            "bias18_min": bias18_min,
-            "bias18_max": bias18_max,
-            "ma50": float(round(ma50, 2)) if ma50 is not None else safe_ma_stats.get("ma50"),
-            "prev_ma50": float(round(prev_ma50, 2)) if prev_ma50 is not None else None,
+            "ma5": float(round(ma5, 2)) if ma5 is not None else safe_ma_stats.get("ma5"),
+            "prev_ma5": float(round(prev_ma5, 2)) if prev_ma5 is not None else None,
+            "bias5": bias5,
+            "bias5_min": bias5_min,
+            "bias5_max": bias5_max,
+            "ma6": float(round(ma5, 2)) if ma5 is not None else safe_ma_stats.get("ma5"),
+            "prev_ma6": float(round(prev_ma5, 2)) if prev_ma5 is not None else None,
+            "bias6": bias5,
+            "bias6_min": bias5_min,
+            "bias6_max": bias5_max,
+            "bias20": bias20,
+            "bias20_min": bias20_min,
+            "bias20_max": bias20_max,
+            "bias18": bias20,
+            "bias18_min": bias20_min,
+            "bias18_max": bias20_max,
+            "ma60": float(round(ma60, 2)) if ma60 is not None else safe_ma_stats.get("ma60"),
+            "prev_ma60": float(round(prev_ma60, 2)) if prev_ma60 is not None else None,
+            "ma50": float(round(ma60, 2)) if ma60 is not None else safe_ma_stats.get("ma60"),
+            "prev_ma50": float(round(prev_ma60, 2)) if prev_ma60 is not None else None,
             "macd_hist": float(round(macd_hist, 4)) if macd_hist is not None else None,
             "prev_macd_hist": float(round(prev_macd_hist, 4)) if prev_macd_hist is not None else None,
             "macd_hist_delta": float(round(macd_hist - prev_macd_hist, 4)) if macd_hist is not None and prev_macd_hist is not None else None,
-            "bias50": bias50,
-            "bias50_min": bias50_min,
-            "bias50_max": bias50_max,
+            "bias60": bias60,
+            "bias60_min": bias60_min,
+            "bias60_max": bias60_max,
+            "bias50": bias60,
+            "bias50_min": bias60_min,
+            "bias50_max": bias60_max,
 
             "sig": int(sig),
             "signal": signal,
@@ -607,6 +624,8 @@ def _build_static_fields(static_row):
     return {
         "eps_Y": to_float_or_none(static_row.get("eps_Y")),
         "eps_ttm": to_float_or_none(static_row.get("eps_ttm")),
+        "roe_last_year": to_float_or_none(static_row.get("roe_last_year")),
+        "roe_ttm": to_float_or_none(static_row.get("roe_ttm")),
         "per_Y": to_float_or_none(static_row.get("per_Y")),
         "per_ttm": to_float_or_none(static_row.get("per_ttm")),
         "rev": to_float_or_none(static_row.get("rev")),
