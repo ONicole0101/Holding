@@ -974,10 +974,7 @@
         s[`chip_date_t${idx}`],
         s[`date${idx}`]
       );
-      const date = chipDateMMDD(value, "");
-      const label = dayLabel(idx);
-      if (label && date) return `${label} ${date}`;
-      return label || date;
+      return chipDateMMDD(value, "");
     }
 
     function kdValue(s, idx) {
