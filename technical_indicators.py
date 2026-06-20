@@ -1,15 +1,43 @@
 import pandas as pd
 
 
+def calculate_kd(rsv, initial_value=50.0):
+    """Calculate KD with the common Taiwan-market 2/3 + 1/3 recursion."""
+    k_values = []
+    d_values = []
+    prev_k = float(initial_value)
+    prev_d = float(initial_value)
+
+    for value in pd.to_numeric(rsv, errors="coerce"):
+        if pd.isna(value):
+            k_values.append(float("nan"))
+            d_values.append(float("nan"))
+            continue
+
+        k = (prev_k * 2 + float(value)) / 3
+        d = (prev_d * 2 + k) / 3
+        k_values.append(k)
+        d_values.append(d)
+        prev_k = k
+        prev_d = d
+
+    return (
+        pd.Series(k_values, index=rsv.index, dtype="float64"),
+        pd.Series(d_values, index=rsv.index, dtype="float64"),
+    )
+
+
 def add_indicators(df):
     try:
+        for col in ("close", "max", "min"):
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
         low_min = df['min'].rolling(9).min()
         high_max = df['max'].rolling(9).max()
-        denom = (high_max - low_min).replace(0, pd.NA)
+        denom = (high_max - low_min).mask(lambda s: s == 0)
         rsv = (df['close'] - low_min) / denom * 100
-        rsv = rsv.ffill()
-        df['K'] = rsv.ewm(com=2).mean()
-        df['D'] = df['K'].ewm(com=2).mean()
+        rsv = pd.to_numeric(rsv, errors="coerce").ffill()
+        df['K'], df['D'] = calculate_kd(rsv)
 
         df['MA6'] = df['close'].rolling(6).mean()
         df['MA18'] = df['close'].rolling(18).mean()

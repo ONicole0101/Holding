@@ -965,6 +965,21 @@
       return chipDateMMDD(value, dayLabel(idx));
     }
 
+    function dayDateLabel(s, idx, prefix = "date") {
+      const value = pickFirst(
+        s[`${prefix}_date_t${idx}`],
+        s[`date_t${idx}`],
+        s[`price_date_t${idx}`],
+        s[`kd_date_t${idx}`],
+        s[`chip_date_t${idx}`],
+        s[`date${idx}`]
+      );
+      const date = chipDateMMDD(value, "");
+      const label = dayLabel(idx);
+      if (label && date) return `${label} ${date}`;
+      return label || date;
+    }
+
     function kdValue(s, idx) {
       if (idx === 0) return pickFirst(s.k_t0, s.kd_k_t0, s.k);
       if (idx === 1) return pickFirst(s.k_t1, s.kd_k_t1, s.prev_k, s.k_prev, s.k_t_1, s.K_t1, s.k1);
@@ -973,11 +988,23 @@
       return null;
     }
 
-    function kdLine(s, idx, value, previousValue) {
-      if (isNil(value)) return "";
-      const label = dayDateMMDD(s, idx, "kd");
-      const colorCls = previousValue === undefined ? "" : chipValueClass(value, previousValue);
-      return `<div class="table-lv2 ${colorCls}">${label ? `${label}：` : ""}K ${fmt(value)}</div>`;
+    function dValue(s, idx) {
+      if (idx === 0) return pickFirst(s.d_t0, s.kd_d_t0, s.d);
+      if (idx === 1) return pickFirst(s.d_t1, s.kd_d_t1, s.prev_d, s.d_prev, s.d_t_1, s.D_t1, s.d1);
+      if (idx === 2) return pickFirst(s.d_t2, s.kd_d_t2, s.prev2_d, s.d_prev2, s.d_t_2, s.D_t2, s.d2);
+      if (idx === 3) return pickFirst(s.d_t3, s.kd_d_t3, s.prev3_d, s.d_prev3, s.d_t_3, s.D_t3, s.d3);
+      return null;
+    }
+
+    function kdLine(s, idx) {
+      const kValue = kdValue(s, idx);
+      const dVal = dValue(s, idx);
+      if (isNil(kValue) && isNil(dVal)) return "";
+      const previousK = kdValue(s, idx + 1);
+      const label = dayDateLabel(s, idx, "kd");
+      const colorCls = isNil(previousK) ? "" : chipValueClass(kValue, previousK);
+      const dPart = isNil(dVal) ? "" : ` / D ${fmt(dVal)}`;
+      return `<div class="table-lv2 ${colorCls}">${label ? `${label}：` : ""}K ${fmt(kValue)}${dPart}</div>`;
     }
 
     function kdDayScore(s) {
@@ -993,34 +1020,23 @@
     }
 
     function renderKDCell(s) {
-      const k0 = kdValue(s, 0);
-      const k1 = kdValue(s, 1);
-      const k2 = kdValue(s, 2);
-      const k3 = kdValue(s, 3);
       const score = kdDayScore(s);
-      const k0Class = isNil(k1) ? "" : chipValueClass(k0, k1);
       return `
         <td>
           <div class="table-lv1 ${trendClass(score)}">${fmtTrend(score)}</div>
-          <div class="table-lv2 ${k0Class}">K ${fmt(k0)}</div>
-          <div class="table-lv2">D ${fmt(s.d)}</div>
-          ${kdLine(s, 1, k1, k2)}
-          ${kdLine(s, 2, k2, k3)}
+          ${kdLine(s, 0)}
+          ${kdLine(s, 1)}
+          ${kdLine(s, 2)}
         </td>`;
     }
 
     function renderKDBlock(s) {
-      const k0 = kdValue(s, 0);
-      const k1 = kdValue(s, 1);
-      const k2 = kdValue(s, 2);
-      const k3 = kdValue(s, 3);
       const score = kdDayScore(s);
-      const k0Class = isNil(k1) ? "" : chipValueClass(k0, k1);
       return `<div class="stock-value">
         <div class="table-lv1 ${trendClass(score)}">${fmtTrend(score)}</div>
-        <div class="table-lv2 ${k0Class}">K ${fmt(k0)} / D ${fmt(s.d)}</div>
-        ${kdLine(s, 1, k1, k2)}
-        ${kdLine(s, 2, k2, k3)}
+        ${kdLine(s, 0)}
+        ${kdLine(s, 1)}
+        ${kdLine(s, 2)}
       </div>`;
     }
 
@@ -1321,14 +1337,7 @@
         case "pbr_latest":
           return `<td>${renderRangeMetric(s.pbr_latest, s.pbr_60d_low, s.pbr_60d_high)}</td>`;
         case "k": {
-          if (currentTab === "technical") return renderKDCell(s);
-          const score = kdDayScore(s);
-          return `
-            <td>
-              <div class="table-lv1 ${trendClass(score)}">${fmtTrend(score)}</div>
-              <div class="table-lv2">K ${fmt(s.k)}</div>
-              <div class="table-lv2">D ${fmt(s.d)}</div>
-            </td>`;
+          return renderKDCell(s);
         }
         case "bb_pct":
           return `
@@ -1418,7 +1427,7 @@
       const overviewGrid = `
         <div class="stock-grid">
           <div class="stock-item"><div class="stock-label">EPS / TTM</div><div class="stock-value"><div class="table-lv1">${fmt(s.eps_Y)}</div><div class="table-lv2">${fmt(s.eps_ttm)}</div></div></div>
-          <div class="stock-item"><div class="stock-label">日KD</div><div class="stock-value"><div class="table-lv1 ${trendClass(kdDayScore(s))}">${fmtTrend(kdDayScore(s))}</div><div class="table-lv2">K ${fmt(s.k)} / D ${fmt(s.d)}</div></div></div>
+          <div class="stock-item"><div class="stock-label">日KD 3天趨勢</div>${renderKDBlock(s)}</div>
           <div class="stock-item"><div class="stock-label">日布林% LH</div><div class="stock-value"><div class="table-lv1 ${trendClass(s.bb_score)}">${fmtTrend(s.bb_score)}</div>${renderRangeMetric(s.bb_pct, s.bb_lower, s.bb_upper)}</div></div>
           <div class="stock-item"><div class="stock-label">量 / 昨 / 增 / 張</div><div class="stock-value"><div>${fmt(s.volume)} 張</div><div class="table-lv2">昨 ${fmt(s.prev_volume)}</div><div class="table-lv2 ${trendClass(s.volume_ratio)}">${isNil(s.volume_ratio) ? "-" : `${fmtTrend(s.volume_ratio)} ${fmt(s.volume_ratio, "%")}`}</div><div class="table-lv2">${isNil(s.volume_add) ? "-" : `${fmt(s.volume_add)} 張`}</div></div></div>
         </div>`;
