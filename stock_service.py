@@ -607,6 +607,8 @@ def _build_static_fields(static_row):
     return {
         "eps_Y": to_float_or_none(static_row.get("eps_Y")),
         "eps_ttm": to_float_or_none(static_row.get("eps_ttm")),
+        "roe_last_year": to_float_or_none(static_row.get("roe_last_year")),
+        "roe_ttm": to_float_or_none(static_row.get("roe_ttm")),
         "per_Y": to_float_or_none(static_row.get("per_Y")),
         "per_ttm": to_float_or_none(static_row.get("per_ttm")),
         "rev": to_float_or_none(static_row.get("rev")),

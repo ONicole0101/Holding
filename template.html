@@ -787,11 +787,12 @@
         ]
       },
       fundamental: {
-        note: "基本面：EPS、營收、毛利率、營益率、淨利率、殖利率、PER/PBR、產業、新聞",
+        note: "基本面：EPS、ROE、營收、毛利率、營益率、淨利率、殖利率、PER/PBR、產業、新聞",
         columns: [
           { key: "code", label: "代碼<br><small>名稱</small>" },
           { key: "price", label: "價格<br><small>60天LH</small>" },
           { key: "eps_Y", label: "EPS<br><small>TTM</small>" },
+          { key: "roe", label: "ROE%<br><small>去年 / TTM</small>" },
           { key: "rev", label: "營收(bn)<br><small>M / Q / Y</small>" },
           { key: "gross_margin", label: "毛利率%<br><small>QoQ / YoY</small>" },
           { key: "operating_margin", label: "營益率%<br><small>QoQ / YoY</small>" },
@@ -1179,6 +1180,13 @@
       </div>`;
     }
 
+    function renderRoeBlock(s) {
+      return `<div class="stock-value">
+        <div class="table-lv1">${fmt(s.roe_last_year, "%")}</div>
+        <div class="table-lv2">TTM ${fmt(s.roe_ttm, "%")}</div>
+      </div>`;
+    }
+
     function dispositionPeriodHtml(s) {
       const start = fmtMonthDay(s.period_start ?? s.disposition_period_start);
       const end = fmtMonthDay(s.period_end ?? s.disposition_period_end);
@@ -1319,6 +1327,8 @@
               <div class="table-lv1">${fmt(s.eps_Y)}</div>
               <div class="table-lv2">${fmt(s.eps_ttm)}</div>
             </td>`;
+        case "roe":
+          return `<td>${renderRoeBlock(s)}</td>`;
         case "rev":
           return `<td>${renderMetric3(s.rev, s.rev_mom, s.rev_qoq, s.rev_yoy)}</td>`;
         case "gross_margin":
@@ -1410,6 +1420,7 @@
         <div class="stock-grid">
           <div class="stock-item"><div class="stock-label">漲跌% / 震幅% LH</div><div class="stock-value">${renderChangePctBlock(s)}</div></div>
           <div class="stock-item"><div class="stock-label">EPS / TTM</div><div class="stock-value"><div class="table-lv1">${fmt(s.eps_Y)}</div><div class="table-lv2">${fmt(s.eps_ttm)}</div></div></div>
+          <div class="stock-item"><div class="stock-label">ROE 去年 / TTM</div>${renderRoeBlock(s)}</div>
           <div class="stock-item"><div class="stock-label">營收</div><div class="stock-value">${renderMetric3(s.rev, s.rev_mom, s.rev_qoq, s.rev_yoy)}</div></div>
           <div class="stock-item"><div class="stock-label">毛利率</div><div class="stock-value">${renderMetric3(s.gross_margin, null, s.gross_margin_qoq, s.gross_margin_yoy_diff)}</div></div>
           <div class="stock-item"><div class="stock-label">營益率</div><div class="stock-value">${renderMetric3(s.operating_margin, null, s.operating_margin_qoq, s.operating_margin_yoy_diff)}</div></div>
@@ -1471,6 +1482,8 @@
         }
         case "yield_value":
           return Number(((s.yield_value ?? 0) * 0.65).toFixed(4));
+        case "roe":
+          return Number(s.roe_ttm ?? s.roe_last_year ?? -999999);
         case "per_latest":
         case "pbr_latest":
           return Number(s[key] ?? -999999);
