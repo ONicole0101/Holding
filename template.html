@@ -928,12 +928,12 @@
       const distance = isResistance ? s.resistance_distance_pct : s.support_distance_pct;
       const dateText = isResistance ? s.resistance_date : s.support_date;
       const dateLabel = chipDateMMDD(dateText);
-      const dateLine = dateLabel ? `<div class="table-lv1">${dateLabel}</div>` : "";
-      const priceLine = `<div class="table-lv2 ${isResistance ? "text-red" : "text-green"}">${isNil(price) ? "-" : fmt(price)}</div>`;
+      const dateLine = dateLabel || "-";
+      const priceLine = isNil(price) ? "-" : fmt(price);
       const distanceText = isNil(distance) ? "-" : `${isResistance ? "+" : "-"}${fmt(distance, "%")}`;
       return `<div class="stock-value">
-        ${dateLine}
-        ${priceLine}
+        <div class="table-lv2">${dateLine}</div>
+        <div class="table-lv1 ${isResistance ? "text-red" : "text-green"}">${priceLine}</div>
         <div class="table-lv2">${distanceText}</div>
       </div>`;
     }
