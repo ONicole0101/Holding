@@ -14,7 +14,8 @@ from technical_indicators import add_indicators, get_kd_trend, get_bb_trend, get
 
 
 STATIC_CSV_PATH = os.getenv("STATIC_CSV_FILE", "AllStatic.csv")
-STATIC_CHIPS_CSV_PATH = os.getenv("STATIC_CHIPS_FILE") or os.getenv("STATIC_CHIP_FILE", "AllStatic_Chips.csv")
+STATIC_CHIPS_CSV_PATH = os.getenv("STATIC_CHIPS_FILE") or os.getenv(
+    "STATIC_CHIP_FILE", "AllStatic_Chips.csv")
 STATIC_NEWS_CSV_PATH = (
     os.getenv("ALLSTATIC_NEWS_OUTPUT_FILE")
     or os.getenv("ALLSTATIC_NEWS_FILE")
@@ -83,7 +84,6 @@ def load_static_map(static_csv_path=STATIC_CSV_PATH, force_reload=False):
         return {}
 
 
-
 def load_chips_static_map(static_chips_csv_path=STATIC_CHIPS_CSV_PATH, force_reload=False):
     global _CHIPS_STATIC_MAP_CACHE, _CHIPS_STATIC_MAP_MTIME
 
@@ -96,11 +96,13 @@ def load_chips_static_map(static_chips_csv_path=STATIC_CHIPS_CSV_PATH, force_rel
         if (not force_reload) and _CHIPS_STATIC_MAP_CACHE is not None and _CHIPS_STATIC_MAP_MTIME == mtime:
             return _CHIPS_STATIC_MAP_CACHE
 
-        df = pd.read_csv(static_chips_csv_path, encoding="utf-8-sig", dtype={"stock_id": str})
+        df = pd.read_csv(static_chips_csv_path,
+                         encoding="utf-8-sig", dtype={"stock_id": str})
         df.columns = df.columns.str.strip()
 
         if "stock_id" not in df.columns:
-            print(f"⚠️ AllStatic_Chips.csv 缺少 stock_id 欄位: {static_chips_csv_path}")
+            print(
+                f"⚠️ AllStatic_Chips.csv 缺少 stock_id 欄位: {static_chips_csv_path}")
             return {}
 
         df = df.where(pd.notna(df), None)
@@ -132,11 +134,13 @@ def load_news_static_map(static_news_csv_path=STATIC_NEWS_CSV_PATH, force_reload
         if (not force_reload) and _NEWS_STATIC_MAP_CACHE is not None and _NEWS_STATIC_MAP_MTIME == mtime:
             return _NEWS_STATIC_MAP_CACHE
 
-        df = pd.read_csv(static_news_csv_path, encoding="utf-8-sig", dtype={"stock_id": str})
+        df = pd.read_csv(static_news_csv_path,
+                         encoding="utf-8-sig", dtype={"stock_id": str})
         df.columns = df.columns.str.strip()
 
         if "stock_id" not in df.columns:
-            print(f"⚠️ AllStatic_news.csv 缺少 stock_id 欄位: {static_news_csv_path}")
+            print(
+                f"⚠️ AllStatic_news.csv 缺少 stock_id 欄位: {static_news_csv_path}")
             return {}
 
         df = df.where(pd.notna(df), None)
@@ -154,6 +158,7 @@ def load_news_static_map(static_news_csv_path=STATIC_NEWS_CSV_PATH, force_reload
     except Exception as e:
         print(f"❌ 讀取 AllStatic_news.csv 失敗: {e}")
         return {}
+
 
 def to_float_or_none(v):
     if v is None:
@@ -310,7 +315,8 @@ def process_stock(s, static_map=None, chips_map=None, news_map=None):
 
         df = add_indicators(df)
         latest, prev, prev2, prev3 = df.iloc[-1], df.iloc[-2], df.iloc[-3], df.iloc[-4]
-        recent_technical_fields = build_recent_technical_fields(latest, prev, prev2, prev3)
+        recent_technical_fields = build_recent_technical_fields(
+            latest, prev, prev2, prev3)
         price_stats = get_price_60d_high_low(df)
         support_resistance = get_support_resistance_levels(df)
         max_price = latest["max"]
@@ -362,14 +368,22 @@ def process_stock(s, static_map=None, chips_map=None, news_map=None):
         k_trend = kd_trend.get("kd_trend")
         d_trend = None
 
-        ma5 = latest["MA5"] if "MA5" in latest and pd.notna(latest["MA5"]) else None
-        prev_ma5 = prev["MA5"] if "MA5" in prev and pd.notna(prev["MA5"]) else None
-        ma20 = latest["MA20"] if "MA20" in latest and pd.notna(latest["MA20"]) else None
-        prev_ma20 = prev["MA20"] if "MA20" in prev and pd.notna(prev["MA20"]) else None
-        ma60 = latest["MA60"] if "MA60" in latest and pd.notna(latest["MA60"]) else None
-        prev_ma60 = prev["MA60"] if "MA60" in prev and pd.notna(prev["MA60"]) else None
-        macd_hist = latest["MACD_HIST"] if "MACD_HIST" in latest and pd.notna(latest["MACD_HIST"]) else None
-        prev_macd_hist = prev["MACD_HIST"] if "MACD_HIST" in prev and pd.notna(prev["MACD_HIST"]) else None
+        ma5 = latest["MA5"] if "MA5" in latest and pd.notna(
+            latest["MA5"]) else None
+        prev_ma5 = prev["MA5"] if "MA5" in prev and pd.notna(
+            prev["MA5"]) else None
+        ma20 = latest["MA20"] if "MA20" in latest and pd.notna(
+            latest["MA20"]) else None
+        prev_ma20 = prev["MA20"] if "MA20" in prev and pd.notna(
+            prev["MA20"]) else None
+        ma60 = latest["MA60"] if "MA60" in latest and pd.notna(
+            latest["MA60"]) else None
+        prev_ma60 = prev["MA60"] if "MA60" in prev and pd.notna(
+            prev["MA60"]) else None
+        macd_hist = latest["MACD_HIST"] if "MACD_HIST" in latest and pd.notna(
+            latest["MACD_HIST"]) else None
+        prev_macd_hist = prev["MACD_HIST"] if "MACD_HIST" in prev and pd.notna(
+            prev["MACD_HIST"]) else None
         close = latest["close"]
         prev_close = prev["close"]
 
@@ -444,14 +458,19 @@ def process_stock(s, static_map=None, chips_map=None, news_map=None):
                 prev_ma50=prev_ma60,
                 macd_hist=macd_hist,
                 prev_macd_hist=prev_macd_hist,
-                chip_signal_state=merged_static_fields.get("chip_signal_state"),
+                chip_signal_state=merged_static_fields.get(
+                    "chip_signal_state"),
                 chip_signal_text=merged_static_fields.get("chip_signal_text"),
-                chip_concentration_score=merged_static_fields.get("chip_concentration_score"),
+                chip_concentration_score=merged_static_fields.get(
+                    "chip_concentration_score"),
                 main_force_score=merged_static_fields.get("main_force_score"),
-                broker_diff_score=merged_static_fields.get("broker_diff_score"),
-                chip_concentration_pct=merged_static_fields.get("chip_concentration_pct"),
+                broker_diff_score=merged_static_fields.get(
+                    "broker_diff_score"),
+                chip_concentration_pct=merged_static_fields.get(
+                    "chip_concentration_pct"),
                 chip_trend_days=merged_static_fields.get("chip_trend_days"),
-                chip_concentration_threshold=merged_static_fields.get("chip_concentration_threshold"),
+                chip_concentration_threshold=merged_static_fields.get(
+                    "chip_concentration_threshold"),
             ) or {"signal": "等待觀察", "reason": "", "signal_text": "等待觀察"}
         except Exception as e:
             print(f"❌ signal error {stock_id}: {e}")
@@ -663,14 +682,15 @@ def _build_static_fields(static_row):
     }
 
 
-
 def _build_chip_fields(chip_row):
     latest_date = to_str_or_none(chip_row.get("chip_latest_date"))
-    latest_concentration = to_float_or_none(chip_row.get("chip_concentration_pct"))
+    latest_concentration = to_float_or_none(
+        chip_row.get("chip_concentration_pct"))
     latest_main_force = to_int_or_none(chip_row.get("main_force_net"))
     latest_broker_diff = to_int_or_none(chip_row.get("broker_diff"))
 
-    t0_concentration = to_float_or_none(chip_row.get("chip_concentration_pct_t0"))
+    t0_concentration = to_float_or_none(
+        chip_row.get("chip_concentration_pct_t0"))
     t0_main_force = to_int_or_none(chip_row.get("main_force_net_t0"))
     t0_broker_diff = to_int_or_none(chip_row.get("broker_diff_t0"))
 
@@ -689,13 +709,13 @@ def _build_chip_fields(chip_row):
         "chip_date_t0": to_str_or_none(chip_row.get("chip_date_t0")) or latest_date,
         "chip_date_t1": to_str_or_none(chip_row.get("chip_date_t1")),
         "chip_date_t2": to_str_or_none(chip_row.get("chip_date_t2")),
-        "chip_concentration_pct_t0": t0_concentration if t0_concentration is not None else latest_concentration,
+        "chip_concentration_pct_t0": t0_concentration,
         "chip_concentration_pct_t1": to_float_or_none(chip_row.get("chip_concentration_pct_t1")),
         "chip_concentration_pct_t2": to_float_or_none(chip_row.get("chip_concentration_pct_t2")),
-        "main_force_net_t0": t0_main_force if t0_main_force is not None else latest_main_force,
+        "main_force_net_t0": t0_main_force,
         "main_force_net_t1": to_int_or_none(chip_row.get("main_force_net_t1")),
         "main_force_net_t2": to_int_or_none(chip_row.get("main_force_net_t2")),
-        "broker_diff_t0": t0_broker_diff if t0_broker_diff is not None else latest_broker_diff,
+        "broker_diff_t0": t0_broker_diff,
         "broker_diff_t1": to_int_or_none(chip_row.get("broker_diff_t1")),
         "broker_diff_t2": to_int_or_none(chip_row.get("broker_diff_t2")),
 
@@ -723,6 +743,7 @@ def _build_news_fields(news_row):
         ),
     }
 
+
 def get_full_stock_analysis(stock_list, static_map=None, chips_map=None, news_map=None):
     results = []
     if static_map is None:
@@ -734,7 +755,8 @@ def get_full_stock_analysis(stock_list, static_map=None, chips_map=None, news_ma
 
     for i, s in enumerate(stock_list, 1):
         #   print(f"處理中 {i}/{len(stock_list)}: {s}")
-        data = process_stock(s, static_map=static_map, chips_map=chips_map, news_map=news_map)
+        data = process_stock(s, static_map=static_map,
+                             chips_map=chips_map, news_map=news_map)
         results.append(data)
 
         if data.get("signal") in ("無資料", "資料不足", "資料異常"):
