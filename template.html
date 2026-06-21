@@ -922,6 +922,20 @@
       return value ? value.replace("/", "") : fallback;
     }
 
+    function renderSupportResistanceBlock(s, type) {
+      const isResistance = type === "resistance";
+      const price = isResistance ? s.resistance_price : s.support_price;
+      const distance = isResistance ? s.resistance_distance_pct : s.support_distance_pct;
+      const dateText = isResistance ? s.resistance_date : s.support_date;
+      const dateLabel = chipDateMMDD(dateText);
+      const priceText = isNil(price) ? "-" : `${dateLabel ? `${dateLabel}：` : ""}${fmt(price)}`;
+      const distanceText = isNil(distance) ? "-" : `${isResistance ? "+" : "-"}${fmt(distance, "%")}`;
+      return `<div class="stock-value">
+        <div class="table-lv1 ${isResistance ? "text-red" : "text-green"}">${priceText}</div>
+        <div class="table-lv2">${distanceText}</div>
+      </div>`;
+    }
+
     function chipValueClass(current, previous) {
       if (isNil(current) || isNil(previous)) return "";
       const cur = Number(current);
@@ -1291,9 +1305,9 @@
         case "price_lh_trend":
           return renderPriceLHTrendCell(s);
         case "resistance_price":
-          return `<td class="sr-price-cell" title="${escapeHtml(supportResistanceTooltip("resistance"))}"><div class="table-lv1 text-red">${fmt(s.resistance_price)}</div><div class="table-lv2">${isNil(s.resistance_distance_pct) ? "-" : `+${fmt(s.resistance_distance_pct, "%")}`}</div></td>`;
+          return `<td class="sr-price-cell" title="${escapeHtml(supportResistanceTooltip("resistance"))}">${renderSupportResistanceBlock(s, "resistance")}</td>`;
         case "support_price":
-          return `<td class="sr-price-cell" title="${escapeHtml(supportResistanceTooltip("support"))}"><div class="table-lv1 text-green">${fmt(s.support_price)}</div><div class="table-lv2">${isNil(s.support_distance_pct) ? "-" : `-${fmt(s.support_distance_pct, "%")}`}</div></td>`;
+          return `<td class="sr-price-cell" title="${escapeHtml(supportResistanceTooltip("support"))}">${renderSupportResistanceBlock(s, "support")}</td>`;
         case "chg":
           return `
             <td>
@@ -1409,8 +1423,8 @@
           <div class="stock-item"><div class="stock-label">日Bias20 LH</div><div class="stock-value">${renderRangeMetric(s.bias20, s.bias20_min, s.bias20_max, "%", distClass(s.bias20))}</div></div>
           <div class="stock-item"><div class="stock-label">日Bias60 LH</div><div class="stock-value">${renderRangeMetric(s.bias60, s.bias60_min, s.bias60_max, "%", distClass(s.bias60))}</div></div>
           <div class="stock-item"><div class="stock-label">量 / 昨 / 增 / 張</div><div class="stock-value"><div>${fmt(s.volume)} 張</div><div class="table-lv2">昨 ${fmt(s.prev_volume)}</div><div class="table-lv2 ${trendClass(s.volume_ratio)}">${isNil(s.volume_ratio) ? "-" : `${fmtTrend(s.volume_ratio)} ${fmt(s.volume_ratio, "%")}`}</div><div class="table-lv2">${isNil(s.volume_add) ? "-" : `${fmt(s.volume_add)} 張`}</div></div></div>
-          <div class="stock-item"><div class="stock-label">壓力點 / 距離</div><div class="stock-value"><div class="table-lv1 text-red">${fmt(s.resistance_price)}</div><div class="table-lv2">${isNil(s.resistance_distance_pct) ? "-" : `+${fmt(s.resistance_distance_pct, "%")}`}</div></div></div>
-          <div class="stock-item"><div class="stock-label">支撐點 / 距離</div><div class="stock-value"><div class="table-lv1 text-green">${fmt(s.support_price)}</div><div class="table-lv2">${isNil(s.support_distance_pct) ? "-" : `-${fmt(s.support_distance_pct, "%")}`}</div></div></div>
+          <div class="stock-item"><div class="stock-label">壓力點 / 距離</div>${renderSupportResistanceBlock(s, "resistance")}</div>
+          <div class="stock-item"><div class="stock-label">支撐點 / 距離</div>${renderSupportResistanceBlock(s, "support")}</div>
           <div class="stock-item"><div class="stock-label">籌碼集中% 3天趨勢</div>${renderChipConcentrationBlock(s)}</div>
           <div class="stock-item"><div class="stock-label">主力買賣超 3天趨勢</div>${renderMainForceBlock(s)}</div>
           <div class="stock-item"><div class="stock-label">買賣家數差 趨勢</div>${renderBrokerDiffBlock(s)}</div>

@@ -259,6 +259,8 @@ def process_stock(s, static_map=None, chips_map=None, news_map=None):
         "entry_note": "",
         "resistance_price": None,
         "support_price": None,
+        "resistance_date": None,
+        "support_date": None,
         "resistance_distance_pct": None,
         "support_distance_pct": None,
     }
@@ -518,6 +520,8 @@ def process_stock(s, static_map=None, chips_map=None, news_map=None):
             "price_60d_low": price_stats.get("price_60d_low"),
             "resistance_price": support_resistance.get("resistance_price"),
             "support_price": support_resistance.get("support_price"),
+            "resistance_date": support_resistance.get("resistance_date"),
+            "support_date": support_resistance.get("support_date"),
             "resistance_distance_pct": support_resistance.get("resistance_distance_pct"),
             "support_distance_pct": support_resistance.get("support_distance_pct"),
             "resistance_touch_count": support_resistance.get("resistance_touch_count"),
