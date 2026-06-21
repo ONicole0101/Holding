@@ -241,6 +241,8 @@ def get_support_resistance_levels(
     empty = {
         "resistance_price": None,
         "support_price": None,
+        "resistance_date": None,
+        "support_date": None,
         "resistance_distance_pct": None,
         "support_distance_pct": None,
         "resistance_touch_count": None,
@@ -260,6 +262,14 @@ def get_support_resistance_levels(
         if value is None:
             return None
         return round(value, ndigits)
+
+    def _date_text(value):
+        try:
+            if value is None or pd.isna(value):
+                return None
+            return pd.Timestamp(value).strftime("%Y-%m-%d")
+        except Exception:
+            return None
 
     def _cluster_levels(levels, tolerance):
         """Cluster close prices and return weighted-average levels."""
@@ -464,6 +474,7 @@ def get_support_resistance_levels(
             rp = resistance["price"]
             result.update({
                 "resistance_price": _round_or_none(rp),
+                "resistance_date": _date_text(resistance.get("last_date")),
                 "resistance_distance_pct": _round_or_none((rp - latest_close) / latest_close * 100),
                 "resistance_touch_count": int(resistance.get("touch_count") or 0),
             })
@@ -471,6 +482,7 @@ def get_support_resistance_levels(
             sp = support["price"]
             result.update({
                 "support_price": _round_or_none(sp),
+                "support_date": _date_text(support.get("last_date")),
                 "support_distance_pct": _round_or_none((latest_close - sp) / latest_close * 100),
                 "support_touch_count": int(support.get("touch_count") or 0),
             })
