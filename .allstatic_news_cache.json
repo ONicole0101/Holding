@@ -1,140 +1,140 @@
 {
   "1101": {
     "name": "台泥",
-    "news_titles_hash": "bec1568f56541dcfceb5d6136db0e9579533cdd8110bb606b819002af68bd568",
+    "news_titles_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "status": "ai/industry_news_refresh",
-    "updated_at": "2026-06-21 00:57:08"
+    "updated_at": "2026-06-21 17:06:07"
   },
   "1216": {
     "name": "統一",
-    "news_titles_hash": "8807153b1ab16699656d3849aac39bad740945fb8b69c6a5cefe08ecd1d5b881",
+    "news_titles_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "status": "ai/industry_news_refresh",
-    "updated_at": "2026-06-21 00:57:11"
+    "updated_at": "2026-06-21 17:06:10"
   },
   "1319": {
     "name": "東陽",
-    "news_titles_hash": "23b750d6a7f5761031273beffd8b01499652d7938c79aa662c70ae045760b552",
+    "news_titles_hash": "2223ec6790192d98b73333b915c119c0c3d3aa28a778e5fae88cf4f9e07bb56f",
     "status": "ai/industry_news_refresh",
-    "updated_at": "2026-06-21 00:57:15"
+    "updated_at": "2026-06-21 17:06:14"
   },
   "1532": {
     "name": "勤美",
-    "news_titles_hash": "14a157895e6480eacd82dc9feeaa9561b2c973fd8e22573557f01f3d5f9bc766",
+    "news_titles_hash": "6a6fee6676a5df8cc8a283ac0e4d0518146d0221fed4a5e7c218f52e2765666b",
     "status": "ai/industry_news_refresh",
-    "updated_at": "2026-06-21 00:57:19"
+    "updated_at": "2026-06-21 17:06:18"
   },
   "2317": {
     "name": "鴻海",
-    "news_titles_hash": "722ce53147ece6537bcafb48985e1de668b2a847536119269dbfa7af629c43d9",
+    "news_titles_hash": "2bda3212b15d63441635dabebd90e28d8694a55e91e70c50a93bc3531b9168b0",
     "status": "ai/industry_news_refresh",
-    "updated_at": "2026-06-21 00:57:22"
+    "updated_at": "2026-06-21 17:06:21"
   },
   "2330": {
     "name": "台積電",
-    "news_titles_hash": "8db4d2c38205e5e934297b64a110c3c88a5e013d00f2028ec79e95124503c36b",
+    "news_titles_hash": "86f3ab36f67c94591d230016f51c167b3a50a5974dceba82bb477f9ee2450b87",
     "status": "ai/industry_news_refresh",
-    "updated_at": "2026-06-21 00:57:26"
+    "updated_at": "2026-06-21 17:06:28"
   },
   "2454": {
     "name": "聯發科",
-    "news_titles_hash": "a7813caaf1d1def0398c5bcb52f74805d046398eb02039d434bd408def24924e",
+    "news_titles_hash": "5b657b6ae90628111228c2511652adaf2cb937fcfffade2d93d2fe788e33c6bc",
     "status": "ai/industry_news_refresh",
-    "updated_at": "2026-06-21 00:57:30"
+    "updated_at": "2026-06-21 17:06:31"
   },
   "2881": {
     "name": "富邦金",
-    "news_titles_hash": "6b74d27f635f2886b2e14e3c1c2b5330162281a8f3a2b7afbeb1840bdf83b1a0",
+    "news_titles_hash": "c9b97e9dbf6622b52741d7366474ee0a0f63f588deb8aebaa579114c196d1879",
     "status": "ai/industry_news_refresh",
-    "updated_at": "2026-06-21 00:57:33"
+    "updated_at": "2026-06-21 17:06:34"
   },
   "2885": {
     "name": "元大金",
-    "news_titles_hash": "e916f543ca68e2c808801ec49a17e3b5e169cc3a8b3e2c0eb57b1fe507df4b3e",
+    "news_titles_hash": "9fcfe562ade023b14713d5a42d93162fe8fe504b62d81d934fb2abd082d7ed35",
     "status": "ai/industry_news_refresh",
-    "updated_at": "2026-06-21 00:57:36"
+    "updated_at": "2026-06-21 17:06:37"
   },
   "2891": {
     "name": "中信金",
-    "news_titles_hash": "5eca008d6477aeb0a66244d1a62986338ba80f275f726ff2d8f9d2454474d3fd",
+    "news_titles_hash": "3042f4aa194aceb7fa3d5813733ee67131ada3ab03d8b775c4703449cdcd67b0",
     "status": "ai/industry_news_refresh",
-    "updated_at": "2026-06-21 00:57:39"
+    "updated_at": "2026-06-21 17:06:41"
   },
   "3017": {
     "name": "奇鋐",
-    "news_titles_hash": "b6ba5c58183a916c88683564bb7fc014c4f44d165cb2a6297908db8e4ac2a4dc",
+    "news_titles_hash": "c3b3ca03a38ccbd1206ac8fe2f8c8f049f6b79ff1a1de039b55484f3bece0a16",
     "status": "ai/industry_news_refresh",
-    "updated_at": "2026-06-21 00:57:43"
+    "updated_at": "2026-06-21 17:06:44"
   },
   "3324": {
     "name": "雙鴻",
-    "news_titles_hash": "98680dd3f46171daf9490b5a580fcd6c16c6286d23d8e9af505c6395c02908b1",
+    "news_titles_hash": "a8d01d52eac0395dc05f7c941ea66288a2c2ace45f514ed7305a39e8f6ecfba8",
     "status": "ai/industry_news_refresh",
-    "updated_at": "2026-06-21 00:57:46"
+    "updated_at": "2026-06-21 17:06:49"
   },
   "3443": {
     "name": "創意",
-    "news_titles_hash": "afbd5affb78d7e446bbc3b8686a0db694dd784187b5e2de090f34a1af081165b",
+    "news_titles_hash": "97b54406e3c7e67039dde2d6114277cf2faa32ac89d66a45a4e490e114d1a94d",
     "status": "ai/industry_news_refresh",
-    "updated_at": "2026-06-21 00:57:49"
+    "updated_at": "2026-06-21 17:06:53"
   },
   "3491": {
     "name": "昇達科",
-    "news_titles_hash": "ca9b045e8fcb04bf408084bf12e4404de5623cdd0665ad266110c476cc4bc82c",
+    "news_titles_hash": "272599ab028d0824107902e41b63c3250db3aa70220cdaa1116d294efd126b5d",
     "status": "ai/industry_news_refresh",
-    "updated_at": "2026-06-21 00:57:52"
+    "updated_at": "2026-06-21 17:06:56"
   },
   "3563": {
     "name": "牧德",
     "news_titles_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "status": "ai/industry_news_refresh",
-    "updated_at": "2026-06-21 00:57:55"
+    "updated_at": "2026-06-21 17:06:58"
   },
   "3653": {
     "name": "健策",
-    "news_titles_hash": "395db3ebf0e64a4f1bb4d8f183db687c810cc228340ff8ba372cdf1a4f767f21",
+    "news_titles_hash": "6f90fff9f3c9873d48a878e0bd89b76e4dd0af850e9bb452bbd882d79bb32e90",
     "status": "ai/industry_news_refresh",
-    "updated_at": "2026-06-21 00:57:58"
+    "updated_at": "2026-06-21 17:07:04"
   },
   "3665": {
     "name": "貿聯-KY",
-    "news_titles_hash": "9c072392b498614c583bd2581c9575332e3bc65a0bf0a8ba160b014403ba8f90",
+    "news_titles_hash": "058ba91d9eff3c4bd9239033ab41551e4b5b49c5b341170350a9eff6257731ca",
     "status": "ai/industry_news_refresh",
-    "updated_at": "2026-06-21 00:58:02"
+    "updated_at": "2026-06-21 17:07:07"
   },
   "5871": {
     "name": "中租-KY",
-    "news_titles_hash": "454f82db32973ce78b9f33b09791af9362df76de8b8302caa50aede7a1ba3609",
+    "news_titles_hash": "0f7860bed42d02eec7646f81f344d3a48513dc8ad2634a73cf4c29813d8fff4d",
     "status": "ai/industry_news_refresh",
-    "updated_at": "2026-06-21 00:58:05"
+    "updated_at": "2026-06-21 17:07:10"
   },
   "6442": {
     "name": "光聖",
     "news_titles_hash": "4eae5e7917847d31c1665fc5f234ee283c2d3181fd8b8484692b5f78993a0c4d",
     "status": "ai/industry_news_refresh",
-    "updated_at": "2026-06-21 00:58:08"
+    "updated_at": "2026-06-21 17:07:13"
   },
   "6510": {
     "name": "精測",
     "news_titles_hash": "0a3b186b3b9ff23b8dba19657e7f38107ab88ffacac1ec6ecc1fea466c06179d",
     "status": "ai/industry_news_refresh",
-    "updated_at": "2026-06-21 00:58:11"
+    "updated_at": "2026-06-21 17:07:16"
   },
   "6515": {
     "name": "穎崴",
-    "news_titles_hash": "8a38d560ff59340413e24ef37cf60f80400a8f1915b62efa02bb6d368f2ac02d",
+    "news_titles_hash": "0286fb1f8564dd02cebee8ed1294056c6b5458268109ff6e43ddc5fd10694092",
     "status": "ai/industry_news_refresh",
-    "updated_at": "2026-06-21 00:58:14"
+    "updated_at": "2026-06-21 17:07:19"
   },
   "6940": {
     "name": "格斯科技*",
     "news_titles_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "status": "ai/industry_news_refresh",
-    "updated_at": "2026-06-21 00:58:17"
+    "updated_at": "2026-06-21 17:07:22"
   },
   "7728": {
     "name": "光焱科技",
     "news_titles_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "status": "ai/industry_news_refresh",
-    "updated_at": "2026-06-21 00:58:19"
+    "updated_at": "2026-06-21 17:07:24"
   }
 }
