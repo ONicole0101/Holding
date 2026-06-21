@@ -1031,25 +1031,21 @@
       return 0;
     }
 
-    function renderKDCell(s) {
+    function renderKDContent(s) {
       const score = kdDayScore(s);
       return `
-        <td>
-          <div class="table-lv1 ${trendClass(score)}">${fmtTrend(score)}</div>
-          ${kdLine(s, 0)}
-          ${kdLine(s, 1)}
-          ${kdLine(s, 2)}
-        </td>`;
-    }
-
-    function renderKDBlock(s) {
-      const score = kdDayScore(s);
-      return `<div class="stock-value">
         <div class="table-lv1 ${trendClass(score)}">${fmtTrend(score)}</div>
         ${kdLine(s, 0)}
         ${kdLine(s, 1)}
-        ${kdLine(s, 2)}
-      </div>`;
+        ${kdLine(s, 2)}`;
+    }
+
+    function renderKDCell(s) {
+      return `<td>${renderKDContent(s)}</td>`;
+    }
+
+    function renderKDBlock(s) {
+      return `<div class="stock-value">${renderKDContent(s)}</div>`;
     }
 
     function priceLHValue(s, idx, kind) {
@@ -1396,7 +1392,18 @@
 
     function renderRow(s) {
       const columns = TAB_CONFIG[currentTab].columns;
-      return `<tr>${columns.map(col => renderCell(s, col.key)).join("")}</tr>`;
+      return `<tr>${columns.map(col => applyColumnClass(renderCell(s, col.key), col)).join("")}</tr>`;
+    }
+
+    function applyColumnClass(cellHtml, col) {
+      const cls = col?.cls;
+      if (!cls) return cellHtml;
+      return String(cellHtml).replace(/<td\b([^>]*)>/, (match, attrs) => {
+        if (/\bclass=/.test(attrs)) {
+          return match.replace(/class="([^"]*)"/, `class="$1 ${cls}"`);
+        }
+        return `<td class="${cls}"${attrs}>`;
+      });
     }
 
     function renderMobileCard(s) {
