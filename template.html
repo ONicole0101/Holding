@@ -1509,11 +1509,11 @@
           <div class="stock-item"><div class="stock-label">買賣方向</div><div class="stock-value">${renderSignalBadge(s)}</div></div>
           <div class="stock-item summary-mobile-item"><div class="stock-label">訊號說明</div><div class="stock-value">${renderSignalText(s.signal_text || "") || "-"}</div></div>
           <div class="stock-item"><div class="stock-label">進場提醒</div><div class="stock-value">${(() => {
-            const note = cleanSignalOutput(s.entry_note || "");
-            if (!note) return "-";
-            const badgeClass = /抄底|追漲/.test(note) ? "up" : /不追價/.test(note) ? "watch" : "";
-            return `<span class="sig ${badgeClass}">${escapeHtml(note)}</span>`;
-          })()}</div></div>
+          const note = cleanSignalOutput(s.entry_note || "");
+          if (!note) return "-";
+          const badgeClass = /抄底|追漲/.test(note) ? "up" : /不追價/.test(note) ? "watch" : "";
+          return `<span class="sig ${badgeClass}">${escapeHtml(note)}</span>`;
+        })()}</div></div>
         </div>`;
 
       const overviewGrid = `
