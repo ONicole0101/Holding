@@ -246,7 +246,6 @@ def build_recent_technical_fields(*rows):
         fields[f"price_date_{suffix}"] = date_text
         fields[f"k_{suffix}"] = round_float_or_none(row.get("K"), 2)
         fields[f"d_{suffix}"] = round_float_or_none(row.get("D"), 2)
-        fields[f"price_open_{suffix}"] = round_float_or_none(row.get("open"), 2)
         fields[f"price_min_{suffix}"] = round_float_or_none(row.get("min"), 2)
         fields[f"price_max_{suffix}"] = round_float_or_none(row.get("max"), 2)
     return fields
@@ -339,7 +338,6 @@ def process_stock(s, static_map=None, chips_map=None, news_map=None):
             latest, prev, prev2, prev3)
         price_stats = get_price_60d_high_low(df)
         support_resistance = get_support_resistance_levels(df)
-        open_price = latest["open"]
         max_price = latest["max"]
         min_price = latest["min"]
         chg = latest["close"] - prev["close"]
@@ -554,7 +552,6 @@ def process_stock(s, static_map=None, chips_map=None, news_map=None):
             "name": name,
             "code": stock_id,
             "price": float(round(close, 2)),
-            "price_open": float(round(open_price, 2)),
             "price_max": float(round(max_price, 2)),
             "price_min": float(round(min_price, 2)),
             "price_60d_high": price_stats.get("price_60d_high"),
