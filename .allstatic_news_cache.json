@@ -17,11 +17,23 @@
     "status": "ai/industry_news_refresh",
     "updated_at": "2026-06-21 20:45:16"
   },
+  "1476": {
+    "name": "儒鴻",
+    "news_titles_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "status": "ai/industry_news_refresh",
+    "updated_at": "2026-06-26 16:38:09"
+  },
   "1532": {
     "name": "勤美",
     "news_titles_hash": "2b0ecf748040747204f3635114fa7a99314afe7e4967cfd56243a9fe1d2e5e87",
     "status": "ai/industry_news_refresh",
     "updated_at": "2026-06-25 16:34:04"
+  },
+  "2313": {
+    "name": "華通",
+    "news_titles_hash": "5f6793317c64df00aaa66b82bf076383d980eb42f69d4ff4c4de8a34d2007612",
+    "status": "ai/industry_news_refresh",
+    "updated_at": "2026-06-26 16:38:13"
   },
   "2317": {
     "name": "鴻海",
@@ -29,11 +41,23 @@
     "status": "ai/industry_news_refresh",
     "updated_at": "2026-06-25 16:34:10"
   },
+  "2327": {
+    "name": "國巨*",
+    "news_titles_hash": "ba16600f9a637aea24c410d80655cc6cb89ed4fbb2da5e70c4025a54272dc5a4",
+    "status": "ai/industry_news_refresh",
+    "updated_at": "2026-06-26 16:38:17"
+  },
   "2330": {
     "name": "台積電",
     "news_titles_hash": "5a42a7a74c512dc68a71fe8cc37c321c7d7eaab9382e9cec78eb70edb047ddb7",
     "status": "ai/industry_news_refresh",
     "updated_at": "2026-06-25 16:34:13"
+  },
+  "2449": {
+    "name": "京元電子",
+    "news_titles_hash": "aecce2270fbcd3b4b7332166a3e13fa4a7419a077efb2eb86c1aba30c9a1f5e7",
+    "status": "ai/industry_news_refresh",
+    "updated_at": "2026-06-26 16:38:20"
   },
   "2454": {
     "name": "聯發科",
