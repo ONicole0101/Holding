@@ -1,12 +1,12 @@
-[32m2026-06-26 09:49:23.168[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
-[32m2026-06-26 09:49:23.319[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
+[32m2026-06-29 11:21:50.073[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
+[32m2026-06-29 11:21:50.186[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
 FinMind: token=True, login=ok, usage=0/6000, remain=6000
 Build chips: total=4, workers=4, trend_days=3, threshold=15, lookback_days=21, output=AllStatic_Chips.csv
-[1/4] 1476 儒鴻 status=ok date=2026-06-26 main=31047 diff=219 state=neutral
+[1/4] 1476 儒鴻 status=ok date=2026-06-29 main=133100 diff=-77 state=neutral
 stock_id name chip_latest_date main_force_net broker_diff   chip_signal_state chips_status
-    1476   儒鴻       2026-06-26          31047         219             neutral           ok
-    2313   華通       2026-06-26        -402777           7 bearish_distributed           ok
-    2327  國巨*       2026-06-26       -2495833          15             neutral           ok
-    2449 京元電子       2026-06-26         671049           3             neutral           ok
+    1476   儒鴻       2026-06-29         133100         -77             neutral           ok
+    2313   華通       2026-06-29        -225221          18 bearish_distributed           ok
+    2327  國巨*       2026-06-29        3385201          -7             neutral           ok
+    2449 京元電子       2026-06-29        -459932          27             neutral           ok
 rows= 4
 status= {'ok': 4}
