@@ -1,30 +1,29 @@
-[32m2026-07-01 10:09:05.056[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
-[32m2026-07-01 10:09:05.218[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
+[32m2026-07-02 09:29:44.814[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
+[32m2026-07-02 09:29:44.988[0m | [1mINFO    [0m | [36mFinMind.data.finmind_api[0m:[36mlogin_by_token[0m:[36m85[0m - [1mLogin success[0m
 FinMind: token=True, login=ok, usage=0/6000, remain=6000
 Build chips: total=22, workers=6, trend_days=3, threshold=15, lookback_days=21, output=AllStatic_Chips.csv
-[1/22] 1216 統一 status=ok date=2026-07-01 main=-70351 diff=264 state=neutral
 stock_id  name chip_latest_date main_force_net broker_diff   chip_signal_state chips_status
-    1101    台泥       2026-07-01      -13774900         313 bearish_distributed           ok
-    1216    統一       2026-07-01         -70351         264             neutral           ok
-    1319    東陽       2026-07-01        -760357         361 bearish_distributed           ok
-    1532    勤美       2026-07-01         -87000           3             neutral           ok
-    2308   台達電       2026-07-01         418925           6             neutral           ok
-    2317    鴻海       2026-07-01       -9702658          16             neutral           ok
-    2330   台積電       2026-07-01        6542614          -5             neutral           ok
-    2454   聯發科       2026-07-01         283602           6             neutral           ok
-    2881   富邦金       2026-07-01       -7697528         150             neutral           ok
-    2885   元大金       2026-07-01          26997          48             neutral           ok
-    2891   中信金       2026-07-01        1067948          19             neutral           ok
-    3017    奇鋐       2026-07-01         316604         -78             neutral           ok
-    3324    雙鴻       2026-07-01          86547          33             neutral           ok
-    3376   新日興       2026-07-01        -930472         272             neutral           ok
-    3491   昇達科       2026-07-01        -225777         200             neutral           ok
-    3563    牧德       2026-07-01         238974        -434             neutral           ok
-    3653    健策       2026-07-01          44719         210 bullish_distributed           ok
-    3665 貿聯-KY       2026-07-01         210198         -89             neutral           ok
-    5871 中租-KY       2026-07-01       -2817974         371             neutral           ok
-    6442    光聖       2026-07-01         -49552         191             neutral           ok
+    1101    台泥       2026-07-02       -5149844         197 bearish_distributed           ok
+    1216    統一       2026-07-02         560995        -142             neutral           ok
+    1319    東陽       2026-07-02        -968909         423 bearish_distributed           ok
+    1532    勤美       2026-07-02          24250          -8             neutral           ok
+    2308   台達電       2026-07-02        -273340          62             neutral           ok
+    2317    鴻海       2026-07-02      -14962671          37             neutral           ok
+    2330   台積電       2026-07-02       -4584198          19             neutral           ok
+    2454   聯發科       2026-07-02        -295993           6             neutral           ok
+    2881   富邦金       2026-07-02       -9371925         178             neutral           ok
+    2885   元大金       2026-07-02        -315378         114             neutral           ok
+    2891   中信金       2026-07-02         363039         155 bullish_distributed           ok
+    3017    奇鋐       2026-07-02         390858         -71             neutral           ok
+    3324    雙鴻       2026-07-02         200747          37             neutral           ok
+    3376   新日興       2026-07-02       -1184216         347             neutral           ok
+    3491   昇達科       2026-07-02         -45031         236 bearish_distributed           ok
+    3563    牧德       2026-07-02            -60          -4             neutral           ok
+    3653    健策       2026-07-02           8607         194 bullish_distributed           ok
+    3665 貿聯-KY       2026-07-02          89332          54             neutral           ok
+    5871 中租-KY       2026-07-02         313055         -89             neutral           ok
+    6442    光聖       2026-07-02          18188         128             neutral           ok
     6940 格斯科技*       2026-07-01        -107256          76 bearish_distributed           ok
-    7728  光焱科技       2026-07-01             10          49             neutral           ok
+    7728  光焱科技       2026-07-02          -1964          27             neutral           ok
 rows= 22
 status= {'ok': 22}
